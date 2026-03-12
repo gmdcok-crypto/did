@@ -1,0 +1,10 @@
+# 개발용: 백엔드 코드를 볼륨으로 마운트하고 --reload
+# 사용: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# 이후 코드 수정 또는 git pull 하면 uvicorn이 자동 재시작되어 바로 반영됨 (재빌드 불필요)
+
+services:
+  backend:
+    volumes:
+      - ./uploads:/app/uploads
+      - ./app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

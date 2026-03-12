@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+backend/venv/
+backend/.venv/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Build / output
+dist/
+dist-ssr/
+*.local
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/**/__pycache__/
+*.py[cod]
+*.pyo
+
+# DB / uploads (선택: 업로드 파일도 올리려면 uploads/ 주석 처리)
+*.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/certs/
+*.pem
+
+# Logs / IDE
+logs/
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store

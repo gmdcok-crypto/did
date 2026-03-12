@@ -1,0 +1,6 @@
+cd backend
+venv\Scripts\activate
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --ssl-keyfile=./certs/key.pem --ssl-certfile=./certs/cert.pem
+
+# 재시작 시: Shutting down / CancelledError / Event loop is closed 는 정상.
+# lifespan에서 engine.dispose() 로 DB 연결 정리함. SSE 연결된 탭 있으면 잠시 대기 후 종료됨.
