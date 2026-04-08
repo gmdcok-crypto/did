@@ -18,7 +18,7 @@
 
 ## 2. MySQL / MariaDB
 
-1. **New → Database → MySQL 또는 MariaDB** (둘 다 `mysql+aiomysql` URL, 앱 동작 동일)
+1. **New → Database → MySQL 또는 MariaDB** (플러그인 `mysql://` URL 은 앱에서 `mysql+asyncmy://` 로 맞춤)
 2. API 서비스 **Variables**에 DB 연결:
    - **Variable Reference**로 **`MYSQL_URL`** (이름 그대로 가능)
    - `DATABASE_URL` 을 안 넣어도, 백엔드가 `MYSQL_URL` 을 `DATABASE_URL` 로 맞춥니다.

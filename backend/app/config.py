@@ -42,9 +42,14 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, v: object) -> object:
-        # Railway MariaDB 등에서 mysql:// 로 주는 경우 aiomysql 드라이버 접두사로 통일
-        if isinstance(v, str) and v.startswith("mysql://") and not v.startswith("mysql+aiomysql://"):
-            return "mysql+aiomysql://" + v[len("mysql://") :]
+        # Railway mysql:// → asyncmy (aiomysql 대비 greenlet/libstdc++ 이슈 완화)
+        if not isinstance(v, str):
+            return v
+        s = v
+        if s.startswith("mysql+aiomysql://"):
+            return "mysql+asyncmy://" + s[len("mysql+aiomysql://") :]
+        if s.startswith("mysql://") and not s.startswith("mysql+asyncmy://"):
+            return "mysql+asyncmy://" + s[len("mysql://") :]
         return v
 
 
