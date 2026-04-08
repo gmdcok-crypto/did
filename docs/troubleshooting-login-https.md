@@ -30,10 +30,9 @@
 
 | 위치 | 내용 |
 |------|------|
-| `backend/docker-compose.yml` | 백엔드를 **기본 HTTPS**로 실행하도록 변경. `certs` 볼륨 마운트 + uvicorn `--ssl-keyfile`, `--ssl-certfile` 사용. |
-| `backend/docker-compose.https.yml` | 내용은 메인에 통합됨. 참고용으로만 유지. |
+| 로컬 실행 | `backend`에서 `uvicorn app.main:app` 에 `--ssl-keyfile=certs/key.pem` `--ssl-certfile=certs/cert.pem` 를 붙이면 **https://localhost:8000**. 인증서는 `python scripts/gen_self_signed_cert.py` 로 생성. |
 
-- **실행**: 인증서 생성 후 `docker compose up -d` 만 하면 https://localhost:8000 으로 기동.
+- **실행**: `docs/https-setup.md` 의 **백엔드 직접 실행 (HTTPS)** 절 참고.
 
 ### 2.2 CMS 개발 서버·프록시 (HTTPS 통일)
 
@@ -57,12 +56,12 @@
 | 위치 | 내용 |
 |------|------|
 | `cms/src/pages/Login.jsx` | 경로 표기를 **d:/did/backend** 로 통일 (표시 시 `\b` 등으로 깨지지 않도록). |
-| `backend/app/main.py` | 시드 실패 시 로그 메시지 추가. 수동 시드 명령 `docker compose exec backend python -m app.init_db` 안내. |
+| `backend/app/main.py` | 시드 실패 시 로그 메시지 추가. 수동 시드: `cd backend` 후 `python -m app.init_db` 안내. |
 
 ### 2.5 데이터가 보이도록 시드 실행
 
-- **관리자 + 기본 그룹**: `docker compose exec backend python -m app.init_db` (이미 실행했다면 생략 가능).
-- **캠페인·스케줄 1개씩**: `docker compose exec backend python -m app.seed_schedule` 실행 시, "기본" 그룹에 빈 캠페인·스케줄이 생겨 대시보드에 숫자가 표시됨. 미디어·디바이스는 CMS에서 직접 추가.
+- **관리자 + 기본 그룹**: `cd backend` → `python -m app.init_db` (이미 실행했다면 생략 가능).
+- **캠페인·스케줄 1개씩**: `python -m app.seed_schedule` 실행 시, "기본" 그룹에 빈 캠페인·스케줄이 생겨 대시보드에 숫자가 표시됨. 미디어·디바이스는 CMS에서 직접 추가.
 
 ---
 
@@ -72,11 +71,11 @@
    `cd d:\did\backend` → `python scripts/gen_self_signed_cert.py`
 
 2. **백엔드 기동**  
-   `docker compose up -d`
+   `cd d:\did\backend` → `docs/https-setup.md` 의 uvicorn HTTPS 명령 (또는 HTTP만 쓰면 `--ssl-*` 없이 실행).
 
 3. **DB 시드 (최초 1회)**  
-   - `docker compose exec backend python -m app.init_db`  
-   - `docker compose exec backend python -m app.seed_schedule`
+   - `python -m app.init_db`  
+   - `python -m app.seed_schedule`
 
 4. **CMS 개발 서버**  
    `cd d:\did\cms` → `npm run dev`
@@ -89,5 +88,5 @@
 ## 4. 참고
 
 - HTTPS 상세: `docs/https-setup.md`
-- 백엔드 로그: `docker compose logs -f backend`
+- 백엔드 로그: 터미널에서 uvicorn을 포그라운드로 띄우면 콘솔에 그대로 출력됨.
 - 경고 "NODE_TLS_REJECT_UNAUTHORIZED=0 makes TLS connections insecure" 는 **로컬 개발 시에만** 사용하는 설정에 대한 안내이며, 운영 환경에서는 사용하지 않음.

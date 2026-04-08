@@ -91,11 +91,17 @@ async def _background_startup_db() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings = get_settings()
-    os.makedirs(settings.upload_dir, exist_ok=True)
-    asyncio.create_task(_background_startup_db())
+    try:
+        s = get_settings()
+        os.makedirs(s.upload_dir, exist_ok=True)
+        asyncio.create_task(_background_startup_db())
+    except Exception as e:
+        print(f"lifespan prep failed (server still binds): {e}")
     yield
-    await engine.dispose()
+    try:
+        await engine.dispose()
+    except Exception as e:
+        print(f"engine.dispose: {e}")
 
 
 _extra_cors = [o.strip() for o in (get_settings().cors_origins_extra or "").split(",") if o.strip()]

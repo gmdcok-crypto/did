@@ -1,9 +1,0 @@
-venv
-__pycache__
-*.pyc
-.env
-.env.*
-certs
-*.db
-uploads/*
-!.gitignore

@@ -50,7 +50,7 @@ export default defineConfig({
   ],
   server: {
     port: 5174,
-    // 인증서 없거나 useHttp면 HTTP로 띄워서 Docker 백엔드(http)와 혼합 콘텐츠 차단 방지
+    // 인증서 없거나 useHttp면 HTTP로 띄워서 로컬 백엔드(http)와 혼합 콘텐츠 차단 방지
     https: !useHttp && hasCerts
       ? {
           key: fs.readFileSync(path.join(certDir, 'key.pem')),

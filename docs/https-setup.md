@@ -11,11 +11,12 @@ python scripts/gen_self_signed_cert.py
 
 → `backend/certs/key.pem`, `cert.pem` 생성됨.
 
-## 2. 백엔드 Docker 실행 (HTTPS 기본)
+## 2. 백엔드 직접 실행 (HTTPS)
 
 ```powershell
 cd d:\did\backend
-docker compose up -d --build
+# .env 에 DATABASE_URL 등 설정 후
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=certs/key.pem --ssl-certfile=certs/cert.pem
 ```
 
 → **https://localhost:8000** 으로 API 서비스 (인증서 없으면 실패 → 1번 먼저 실행).
@@ -54,9 +55,9 @@ npm run dev
 ## 6. ERR_SSL_PROTOCOL_ERROR 나올 때
 
 - **의미**: 브라우저는 HTTPS로 접속했는데, 그 포트의 서버는 HTTP만 받고 있음.
-- **확인**: (1) `backend/certs/key.pem`, `cert.pem` 존재 (2) 백엔드는 `docker compose up -d` 로 띄우고 로그에 `https://0.0.0.0:8000` (3) CMS·플레이어는 `npm run dev` 만 사용 (dev:http·VITE_DEV_HTTP 사용 안 함).
+- **확인**: (1) `backend/certs/key.pem`, `cert.pem` 존재 (2) 백엔드는 위 **uvicorn … --ssl-keyfile …** 로 띄우고 로그에 `https://0.0.0.0:8000` (3) CMS·플레이어는 `npm run dev` 만 사용 (dev:http·VITE_DEV_HTTP 사용 안 함).
 - **조치**: 인증서 생성 → 백엔드 재기동 → CMS·플레이어 `npm run dev` 후 **https://** 로만 접속.
 
 ## 7. 요약
 
-- **HTTPS 통일**: 인증서 생성 → `docker compose up -d` → CMS·플레이어 각각 `npm run dev`. API는 **https://localhost:8000**.
+- **HTTPS 통일**: 인증서 생성 → 백엔드 **uvicorn HTTPS** → CMS·플레이어 각각 `npm run dev`. API는 **https://localhost:8000**.

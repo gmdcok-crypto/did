@@ -1,6 +1,6 @@
 # Railway 배포 (MariaDB + 단일 API 서비스)
 
-Docker 없이 **MariaDB + API 서비스 하나**면 됩니다. Nixpacks가 **플레이어 + CMS** 를 모두 빌드해 백엔드에 넣습니다.
+**Railway**는 **`nixpacks.toml`** 로 빌드합니다(Docker 없음). DB는 Railway **MySQL/MariaDB 플러그인**의 `MYSQL_URL`(또는 `DATABASE_URL`)을 API 서비스 변수에 연결합니다.
 
 | 구성 | 역할 |
 |------|------|

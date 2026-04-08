@@ -1,6 +1,6 @@
-# 플레이어 외부 접속 (노트북 + Docker 기준)
+# 플레이어 외부 접속 (노트북 + 로컬 백엔드 기준)
 
-- **조건**: Docker 백엔드 = 노트북 localhost, 플레이어는 외부(다른 PC/폰)에서 접속, CMS는 노트북에서만 사용, 노트북 이동 시 IP 변경 가능.
+- **조건**: 백엔드(uvicorn) = 노트북에서 8000 포트, 플레이어는 외부(다른 PC/폰)에서 접속, CMS는 노트북에서만 사용, 노트북 이동 시 IP 변경 가능.
 - **방식**: 플레이어를 백엔드와 **같은 주소(origin)**에서 서빙하면, 외부에서 `http://노트북IP:8000` 하나만 알면 되고 **IP가 바뀌어도 설정 변경 없음**.
 
 ## 1. 플레이어 빌드 → 백엔드에 넣기
@@ -16,11 +16,12 @@ xcopy /E /I /Y dist\* d:\did\backend\player_dist\
 
 (또는 `player/dist/` 안 내용을 `backend/player_dist/`에 수동으로 복사.)
 
-## 2. Docker 백엔드 실행
+## 2. 백엔드 실행
 
 ```powershell
 cd d:\did\backend
-docker compose up -d
+# .env 에 DATABASE_URL 설정 후 (예: Railway MySQL 터널 또는 로컬 MariaDB)
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 - `player_dist`에 `index.html`과 `assets/` 폴더가 있으면 백엔드가 **루트(/)에서 플레이어**를 서빙합니다.

@@ -1,11 +1,11 @@
-# Railway 배포 (Docker 미사용, Nixpacks 빌드는 nixpacks.toml 참고)
-# 서비스 루트 디렉터리: 저장소 루트 (/)
+# Railway: Nixpacks (nixpacks.toml). Docker 미사용.
+# 서비스 Root Directory: 저장소 루트 (/)
 
 [build]
 builder = "nixpacks"
 
 [deploy]
-# greenlet 로딩 시 libstdc++.so.6 검색 경로 보강 (Nix/Debian 혼합 이미지)
+# greenlet 로딩 시 libstdc++.so.6 검색 경로 보강
 startCommand = "cd /app/backend && LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH /app/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300

@@ -1,6 +1,6 @@
 """
-SQLite(app.db) 데이터를 Docker MariaDB로 옮기는 스크립트.
-실행 전: Docker MariaDB 실행 중이어야 함 (docker compose up -d)
+SQLite(app.db) 데이터를 MySQL/MariaDB로 옮기는 스크립트.
+실행 전: 대상 DB가 접속 가능해야 함 (로컬·Railway 등, DATABASE_URL).
   백엔드가 한 번이라도 MariaDB로 기동되어 테이블이 생성되어 있어야 함.
 
 사용:
