@@ -11,15 +11,19 @@
 
 1. 프로젝트에 **New → Database → MariaDB** (또는 MySQL) 추가
 2. MariaDB 서비스 **Variables**에서 `MYSQL_URL`, `MYSQLHOST`, `MYSQLUSER` 등 확인
-3. 백엔드 서비스에 **`DATABASE_URL`** 을 넣습니다.
+3. 백엔드(API) 서비스와 DB 연결:
+   - **권장**: API 서비스에서 **Variable Reference**로 MariaDB의 **`MYSQL_URL`** 을 그대로 가져오기 (이름은 `MYSQL_URL` 유지 가능)
+   - 또는 API 서비스에 **`DATABASE_URL`** 을 추가하고, 값으로 MariaDB의 **`MYSQL_URL`** 과 동일한 URL을 넣거나 Reference로 연결
 
-형식:
+`DATABASE_URL` 을 아예 안 넣고 **`MYSQL_URL`만** 있어도, 백엔드 코드가 내부적으로 `DATABASE_URL`로 맞춥니다.
+
+형식 예:
 
 ```env
 DATABASE_URL=mysql+aiomysql://USER:PASSWORD@HOST:PORT/DATABASE
 ```
 
-Railway가 `mysql://...` 한 줄만 줄 경우 그대로 넣어도 됩니다. 앱이 **`mysql+aiomysql://`** 로 자동 보정합니다.
+Railway가 `mysql://...` 한 줄만 줄 경우 그대로 두어도 됩니다. 앱이 **`mysql+aiomysql://`** 로 자동 보정합니다.
 
 ## 3. API + 플레이어 서비스
 

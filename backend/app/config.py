@@ -1,7 +1,28 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _prepare_database_url_from_mysql() -> None:
+    """Railway: MariaDB 플러그인은 MYSQL_URL만 줄 때가 많음. DATABASE_URL이 없으면 복사."""
+    import os
+
+    try:
+        from dotenv import load_dotenv
+
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+        if env_path.is_file():
+            load_dotenv(env_path)
+    except ImportError:
+        pass
+
+    if os.environ.get("DATABASE_URL", "").strip():
+        return
+    mysql = os.environ.get("MYSQL_URL", "").strip()
+    if mysql:
+        os.environ["DATABASE_URL"] = mysql
 
 
 class Settings(BaseSettings):
@@ -29,4 +50,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    _prepare_database_url_from_mysql()
     return Settings()
