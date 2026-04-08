@@ -75,4 +75,5 @@ Docker 없이 **MariaDB + API 서비스 하나**면 됩니다. Nixpacks가 **플
 - **`/admin` 404**: 빌드 로그에 `cms` 빌드·`cms_dist` 복사가 있는지 확인.
 - **DB 연결 실패**: DB와 API가 같은 프로젝트인지, `MYSQL_URL` 이 **Private** 주소인지 확인 (Public URL로 API가 붙으면 테이블이 다른 곳에 생길 수 있음).
 - **테이블이 비어 보임**: 브라우저에서 `https://<API>/api/db-status` 로 앱이 보는 DB 이름·테이블 목록 확인. DBeaver 등은 **같은 DB 이름**을 보고 있는지 비교.
+- **`greenlet` / `libstdc++.so.6` 오류**: `nixpacks.toml`에 `nixLibs`·`aptPkgs(libstdc++6)`·`railway.toml`의 `LD_LIBRARY_PATH` 가 맞는지 확인 후 재배포.
 - **테이블이 비어 있음 / 로그인 불가**: 브라우저에서 **`https://<API>/setup-database`** 또는 **`https://<API>/api/auth/ensure-seed`** (정확히 이 경로, `/admin` 붙이면 안 됨). CMS 로그인 화면도 자동으로 `ensure-seed` 를 호출합니다. `{"detail":"Not Found"}` 이면 URL 오타·재배포 미반영 여부를 확인하세요.

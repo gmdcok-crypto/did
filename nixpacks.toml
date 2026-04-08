@@ -4,7 +4,10 @@
 [phases.setup]
 # Nix Python은 PEP 668(externally-managed) → 전역 pip 설치 불가. /app/.venv 에 격리 후 설치
 # Railway Nixpacks nixpkgs 스냅샷에 nodejs_22 가 없음 → nodejs_20 사용, npm은 --ignore-engines (Vite 엔진 경고만 무시)
+# greenlet(SQLAlchemy async) 이 libstdc++.so.6 필요 — nixLibs + apt 로 런타임 제공
 nixPkgs = ["nodejs_20", "python312", "gcc"]
+nixLibs = ["gcc"]
+aptPkgs = ["libstdc++6"]
 
 [phases.install]
 dependsOn = ["setup"]
