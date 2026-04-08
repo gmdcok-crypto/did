@@ -40,7 +40,11 @@ async def init_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    # DB가 아직 없거나 URL이 틀려도 프로세스는 뜨게 함(Railway 헬스체크·로그 확인용)
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"init_db failed (check DATABASE_URL / MariaDB): {e}")
     settings = get_settings()
     os.makedirs(settings.upload_dir, exist_ok=True)
     # 관리자 계정이 하나도 없으면 기본 계정 생성 (로그인 가능하도록)
