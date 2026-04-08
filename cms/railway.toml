@@ -1,0 +1,11 @@
+# Railway: 서비스 Settings → Root Directory = cms
+# 빌드 시 VITE_API_URL 이 있어야 API 주소가 번들에 들어갑니다.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "./node_modules/.bin/serve dist -s -l tcp://0.0.0.0:$PORT"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"

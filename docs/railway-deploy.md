@@ -1,76 +1,99 @@
-# Railway 배포 (Docker 없음)
+# Railway 전체 세팅 (MariaDB + API·플레이어 + CMS)
 
-저장소 루트에 `nixpacks.toml`, `railway.toml`이 있으면 **백엔드(FastAPI) + 플레이어(PWA 빌드 → `backend/player_dist`)** 를 한 서비스로 올릴 수 있습니다. DB는 **Railway MariaDB**를 권장합니다.
+Docker 없이 **한 GitHub 저장소**로 아래 **3개 서비스 + DB** 를 구성합니다.
 
-## 1. 준비
+| 구성 | 역할 | Root Directory | 설정 파일 |
+|------|------|----------------|-----------|
+| **MariaDB** | DB | (플러그인) | Railway 대시보드 |
+| **API** | FastAPI, 플레이어 PWA, `/api`, `/uploads` | **`/`** (저장소 루트) | `nixpacks.toml`, `railway.toml` |
+| **CMS** | 관리자 React 정적 서빙 | **`cms`** | `cms/nixpacks.toml`, `cms/railway.toml` |
 
-- GitHub에 코드 푸시
-- [Railway](https://railway.app)에서 **New Project → Deploy from GitHub** 로 이 저장소 연결
+---
 
-## 2. MariaDB
+## 0. 한 번에 올리는 순서
 
-1. 프로젝트에 **New → Database → MariaDB** (또는 MySQL) 추가
-2. MariaDB 서비스 **Variables**에서 `MYSQL_URL`, `MYSQLHOST`, `MYSQLUSER` 등 확인
-3. 백엔드(API) 서비스와 DB 연결:
-   - **권장**: API 서비스에서 **Variable Reference**로 MariaDB의 **`MYSQL_URL`** 을 그대로 가져오기 (이름은 `MYSQL_URL` 유지 가능)
-   - 또는 API 서비스에 **`DATABASE_URL`** 을 추가하고, 값으로 MariaDB의 **`MYSQL_URL`** 과 동일한 URL을 넣거나 Reference로 연결
+1. GitHub에 코드 푸시
+2. [Railway](https://railway.app) → **New Project** → **Deploy from GitHub** → 이 저장소 선택
+3. **MariaDB** 추가 (Database → MariaDB)
+4. **API 서비스** (아래 §1) — 먼저 배포해 **공개 URL** 확인
+5. **CMS 서비스** (아래 §2) — `VITE_API_URL` 에 API 주소 넣고 배포
 
-`DATABASE_URL` 을 아예 안 넣고 **`MYSQL_URL`만** 있어도, 백엔드 코드가 내부적으로 `DATABASE_URL`로 맞춥니다.
+---
 
-형식 예:
+## 1. MariaDB
 
-```env
-DATABASE_URL=mysql+aiomysql://USER:PASSWORD@HOST:PORT/DATABASE
-```
+1. 프로젝트에서 **New → Database → MariaDB**
+2. API 서비스 **Variables**에 MariaDB 연결:
+   - **권장**: **Variable Reference**로 MariaDB의 **`MYSQL_URL`** 을 API 서비스에 연결 (이름 그대로 `MYSQL_URL` 가능)
+   - `DATABASE_URL` 을 따로 안 넣어도, 백엔드가 `MYSQL_URL` 을 `DATABASE_URL` 로 맞춥니다.
 
-Railway가 `mysql://...` 한 줄만 줄 경우 그대로 두어도 됩니다. 앱이 **`mysql+aiomysql://`** 로 자동 보정합니다.
+---
 
-## 3. API + 플레이어 서비스
+## 2. API + 플레이어 서비스
 
-1. **New → GitHub Repo** (또는 기존 서비스)로 같은 저장소 연결
-2. 서비스 **Settings → Root Directory** 를 **`/`** (저장소 루트)로 설정  
-   - `nixpacks.toml`이 루트에 있어야 플레이어 빌드가 실행됩니다.
-3. **Variables** (예시):
+1. 같은 프로젝트에 **GitHub 저장소**로 서비스 추가 (이미 있으면 해당 서비스 선택)
+2. **Settings → Root Directory** → **`/`** (비우지 말고 **저장소 루트**)
+3. **Variables** (필수):
 
 | 변수 | 설명 |
 |------|------|
-| `DATABASE_URL` | MariaDB 연결 문자열 (위 참고) |
+| `MYSQL_URL` | MariaDB에서 Reference (위 §1) |
 | `SECRET_KEY` | JWT용 긴 임의 문자열 |
-| `REGISTRATION_AUTH_CODE` | 플레이어 디바이스 등록용 코드 (운영 값으로 변경) |
+| `REGISTRATION_AUTH_CODE` | 플레이어 디바이스 등록 코드 (운영 값으로 변경) |
 
-선택:
+선택: `CORS_ORIGINS_EXTRA` — 커스텀 도메인만 쓸 때 CMS origin 등
 
-| 변수 | 설명 |
+4. **Deploy** 후 확인:
+   - `https://<API도메인>/health` → `{"status":"ok"}`
+   - `https://<API도메인>/` → 플레이어 UI
+   - `https://<API도메인>/docs` → API 문서
+
+빌드: 루트 `nixpacks.toml` 이 Python venv + `player` 빌드 → `backend/player_dist/` 복사. 시작: 루트 `railway.toml` 의 uvicorn.
+
+---
+
+## 3. CMS 서비스 (관리자)
+
+1. 같은 프로젝트에서 **New → GitHub Repo** → **같은 저장소** 선택
+2. **Settings → Root Directory** → **`cms`**
+3. **Variables** (빌드에 반영되므로 **배포 전** 설정):
+
+| 변수 | 예시 | 설명 |
+|------|------|------|
+| `VITE_API_URL` | `https://<API서비스이름>.up.railway.app/api` | §2에서 나온 API **공개 HTTPS URL** + `/api` |
+
+4. **Deploy**
+
+배포 후 **관리자 URL** = CMS 서비스에 Railway가 붙인 공개 URL (예: `https://xxxx.up.railway.app`).
+
+- 로그인: `admin@example.com` / `admin123` (최초 시드, 운영에서 비밀번호 변경)
+
+`*.up.railway.app` 간 CORS 는 API에 이미 허용 패턴이 있어 별도 설정이 없어도 되는 경우가 많습니다.
+
+---
+
+## 4. URL 정리
+
+| 용도 | 주소 |
 |------|------|
-| `CORS_ORIGINS_EXTRA` | CMS를 **별도 도메인**에 둘 때만 (쉼표로 origin 나열) |
+| **플레이어** | `https://<API>/` |
+| **API·Swagger** | `https://<API>/docs` |
+| **헬스** | `https://<API>/health` |
+| **CMS(관리자)** | `https://<CMS서비스>/` (CMS 전용 서비스 URL) |
 
-4. **Deploy** 후 공개 URL에서 `/health` → `{"status":"ok"}`, 루트 `/` → 플레이어 UI, `/docs` → API 문서
+API URL이 바뀌면 `VITE_API_URL` 을 수정하고 **CMS를 다시 배포**해야 합니다 (Vite는 빌드 시 API 주소를 박음).
 
-빌드는 Nixpacks가 **`python3 -m venv /app/.venv`** 후 `/app/.venv/bin/pip install -r backend/requirements.txt`(PEP 668 회피) → `player`에서 `npm ci` / `npm run build` → 결과를 `backend/player_dist/` 로 복사합니다. 시작은 `railway.toml`의 **`/app/.venv/bin/uvicorn`** 입니다.
+---
 
-### 업로드 파일
+## 5. 업로드 파일
 
-`./uploads` 는 컨테이너 로컬 디스크입니다. 재시작 시 유실될 수 있으니, 영구 보관이 필요하면 Railway **Volume**을 마운트하고 `UPLOAD_DIR`을 그 경로로 맞추면 됩니다.
+`backend/uploads` 는 컨테이너 디스크입니다. 유실을 막으려면 Railway **Volume** + `UPLOAD_DIR` 환경 변수로 경로 지정.
 
-## 4. CMS (별도 서비스 권장)
-
-CMS는 Vite SPA이므로 **정적 사이트**로 두는 것이 일반적입니다.
-
-1. 같은 프로젝트에 **새 서비스** 추가 → 같은 GitHub 저장소
-2. **Root Directory**: `cms`
-3. **Build Command**: `npm ci && npm run build`
-4. **Build** 전에 Variables에 **`VITE_API_URL`** 설정 (예: `https://<API서비스>.up.railway.app/api`)
-5. Railway **Static** 템플릿이 있다면 출력 디렉터리 `dist` 지정, 또는 플랫폼 안내에 따라 정적 호스팅
-
-CORS: API 서비스가 `*.up.railway.app` 을 정규식으로 허용하도록 되어 있어, CMS가 `https://xxxx.up.railway.app` 형태면 추가 설정 없이 동작하는 경우가 많습니다. 커스텀 도메인만 쓸 때는 `CORS_ORIGINS_EXTRA`에 CMS origin을 넣으세요.
-
-## 5. 첫 로그인
-
-백엔드 기동 시 사용자가 없으면 `admin@example.com` / `admin123` 이 생성됩니다. 운영에서는 즉시 비밀번호를 바꾸세요.
+---
 
 ## 문제 해결
 
-- **헬스체크 실패 / Service Unavailable**: `DATABASE_URL`이 틀리거나 MariaDB가 같은 프로젝트·Private Network에 없으면 기동 시 DB 연결이 실패할 수 있습니다. 최신 코드는 `init_db` 실패 시에도 프로세스는 뜨고 `/health`는 200입니다. 그래도 안 되면 **Deploy 로그**에서 `cd /app/backend`, `/app/.venv`, `PORT` 오류 확인.
-- **빌드 실패 (Node/Python)**: Railway 로그에서 `nixpacks` 단계 확인. 루트가 `/` 인지 확인.
-- **DB 연결 실패**: `DATABASE_URL` 호스트/포트가 **Private Network** 기준인지, 백엔드와 MariaDB가 같은 프로젝트인지 확인.
-- **플레이어 404**: `player_dist`에 빌드가 복사되지 않은 경우 → 빌드 로그에 `npm run build`, `cp ... player_dist` 가 있는지 확인.
+- **헬스체크 실패**: Deploy 로그에서 `MYSQL_URL`, `/app/backend`, `/app/.venv`, `PORT` 확인.
+- **CMS가 API에 못 붙음**: `VITE_API_URL` 이 `https://.../api` 형식인지, CMS **재빌드** 했는지 확인.
+- **빌드 실패 (Node)**: Root Directory 가 API는 `/`, CMS는 `cms` 인지 확인.
+- **DB 연결 실패**: MariaDB와 API가 **같은 프로젝트**인지, `MYSQL_URL` 이 **Private** 주소인지 확인.
