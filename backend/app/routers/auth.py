@@ -43,9 +43,8 @@ async def me(user: User = Depends(get_current_user)):
     return MeResponse(email=user.email, role=user.role)
 
 
-@router.get("/ensure-seed")
-async def ensure_seed():
-    """테이블이 없을 때 create_all + 기본 그룹·관리자 시드. CMS 로그인 화면에서 호출 (인증 불필요)."""
+async def run_ensure_seed() -> dict:
+    """create_all + 기본 그룹·관리자 시드. 라우터·main 양쪽에서 호출."""
     import app.models  # noqa: F401 — 모든 모델을 metadata에 등록
 
     from app.auth import get_password_hash
@@ -88,3 +87,9 @@ async def ensure_seed():
         "created_admin": created_admin,
         "created_group": created_group,
     }
+
+
+@router.get("/ensure-seed")
+async def ensure_seed():
+    """CMS 로그인 화면에서 호출 (인증 불필요)."""
+    return await run_ensure_seed()

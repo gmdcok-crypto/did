@@ -146,6 +146,14 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/setup-database", include_in_schema=False)
+async def setup_database_public():
+    """DB 테이블·기본 계정이 없을 때 초기화. URL이 짧아 브라우저에서 호출하기 쉬움."""
+    from app.routers.auth import run_ensure_seed
+
+    return await run_ensure_seed()
+
+
 if SERVE_PLAYER:
     @app.get("/{full_path:path}")
     def serve_player_spa(full_path: str):
@@ -153,7 +161,7 @@ if SERVE_PLAYER:
             raise HTTPException(status_code=404)
         if full_path.startswith("admin") or full_path.startswith("admin/"):
             raise HTTPException(status_code=404)
-        if full_path in ("health", "docs", "openapi.json", "redoc"):
+        if full_path in ("health", "docs", "openapi.json", "redoc", "setup-database"):
             raise HTTPException(status_code=404)
         return FileResponse(PLAYER_INDEX)
 else:
