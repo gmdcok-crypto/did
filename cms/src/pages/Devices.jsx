@@ -206,49 +206,35 @@ export default function Devices() {
     <div className="page">
       <h1>디바이스</h1>
 
-      {user?.role === 'admin' && (
-        <section className="card section">
-          <h2>디바이스 등록 인증코드</h2>
-          <p className="muted">
-            플레이어에서 최초 등록할 때 입력하는 코드입니다. 변경 후에는 모든 디스플레이에 새 코드를 알려 주세요.
-          </p>
-          {regLoading ? (
-            <p className="muted">불러오는 중…</p>
-          ) : (
-            <form className="form-inline" onSubmit={saveRegistrationCode} style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div className="devices-top-row">
+        {user?.role === 'admin' && (
+          <section className="card section devices-section-reg">
+            <h2>디바이스 등록 인증코드</h2>
+            <form className="form-inline devices-reg-form" onSubmit={saveRegistrationCode}>
               <input
                 type="text"
                 autoComplete="off"
                 value={regAuthCode}
                 onChange={(e) => setRegAuthCode(e.target.value)}
                 placeholder="인증코드"
-                style={{ minWidth: '12rem' }}
+                disabled={regLoading}
               />
-              <button type="submit" className="btn btn-primary" disabled={regSaving}>
+              <button type="submit" className="btn btn-primary" disabled={regSaving || regLoading}>
                 {regSaving ? '저장 중…' : '저장'}
               </button>
               {regUsesDatabase && (
-                <button type="button" className="btn" onClick={clearRegistrationOverride} disabled={regSaving}>
-                  DB 저장 지우기 (환경 변수로 복귀)
+                <button type="button" className="btn" onClick={clearRegistrationOverride} disabled={regSaving || regLoading}>
+                  DB 초기화
                 </button>
               )}
             </form>
-          )}
-          {!regLoading && !regUsesDatabase && (
-            <p className="muted" style={{ marginTop: '0.5rem' }}>
-              현재 값은 서버 환경 변수(REGISTRATION_AUTH_CODE) 기준입니다. 저장하면 DB에 고정됩니다.
-            </p>
-          )}
-        </section>
-      )}
+          </section>
+        )}
 
-      {/* 디바이스 그룹 */}
-      <section className="card section">
-        <h2>디바이스 그룹</h2>
-        <ul className="group-list">
-          {groups.length === 0 ? (
-            <li className="muted">그룹이 없습니다. 아래에서 추가하세요.</li>
-          ) : (
+        <section className="card section devices-section-groups">
+          <h2>디바이스 그룹</h2>
+          <ul className="group-list">
+            {groups.length === 0 ? null : (
             groups.map((g) => (
               <li key={g.id}>
                 {editingGroupId === g.id ? (
@@ -285,20 +271,21 @@ export default function Devices() {
                 )}
               </li>
             ))
-          )}
-        </ul>
-        <form onSubmit={addGroup} className="form-inline">
-          <input
-            type="text"
-            placeholder="그룹 이름"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-          />
-          <button type="submit" className="btn btn-primary">
-            그룹 추가
-          </button>
-        </form>
-      </section>
+            )}
+          </ul>
+          <form onSubmit={addGroup} className="form-inline">
+            <input
+              type="text"
+              placeholder="그룹 이름"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+            />
+            <button type="submit" className="btn btn-primary">
+              그룹 추가
+            </button>
+          </form>
+        </section>
+      </div>
 
       {/* 디바이스 목록 */}
       <section className="card section">
@@ -320,7 +307,7 @@ export default function Devices() {
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>등록된 디바이스가 없습니다. 플레이어에서 인증코드·이름·위치로 등록하면 여기에 표시됩니다.</td>
+                  <td colSpan={8}>—</td>
                 </tr>
               ) : (
                 list.map((d) => (

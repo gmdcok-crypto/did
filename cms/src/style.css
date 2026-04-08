@@ -472,6 +472,33 @@ a:hover {
 }
 
 /* Devices */
+.devices-top-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.devices-top-row .card.section {
+  margin-bottom: 0;
+}
+
+.devices-top-row .card.section:only-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .devices-top-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.devices-reg-form input {
+  min-width: 10rem;
+  flex: 1 1 10rem;
+}
+
 .card.section {
   background: var(--bg-surface);
   border: 1px solid var(--border);
