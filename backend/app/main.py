@@ -19,6 +19,14 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        def _log_tables(sync_conn):
+            from sqlalchemy import inspect
+
+            names = inspect(sync_conn).get_table_names()
+            print(f"create_all done; tables in DB: {names}")
+
+        await conn.run_sync(_log_tables)
         # SQLite 기존 DB에만: registered_at 컬럼 추가 (MariaDB/PostgreSQL은 create_all에 이미 포함)
         if engine.dialect.name == "sqlite":
             def add_registered_at(sync_conn):
@@ -42,7 +50,7 @@ async def init_db():
 
 
 async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0) -> bool:
-    """MariaDB 기동 지연·네트워크 대비해 create_all 재시도. 성공 시 True."""
+    """MySQL/MariaDB 기동 지연·네트워크 대비해 create_all 재시도. 성공 시 True."""
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -55,7 +63,7 @@ async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0)
             print(f"init_db attempt {attempt}/{max_attempts} failed: {e}")
             if attempt < max_attempts:
                 await asyncio.sleep(delay_seconds)
-    print(f"init_db gave up after {max_attempts} attempts (check DATABASE_URL / MariaDB): {last_err}")
+    print(f"init_db gave up after {max_attempts} attempts (check DATABASE_URL / MySQL): {last_err}")
     return False
 
 
@@ -162,6 +170,38 @@ if SERVE_CMS:
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/db-status", include_in_schema=False)
+async def db_status():
+    """현재 연결된 DB 이름·테이블 목록(진단용). MySQL·MariaDB 동일."""
+    try:
+        async with engine.connect() as conn:
+            db_name = (await conn.execute(text("SELECT DATABASE()"))).scalar_one_or_none()
+            r = await conn.execute(
+                text(
+                    "SELECT TABLE_NAME FROM information_schema.TABLES "
+                    "WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME"
+                )
+            )
+            tables = [row[0] for row in r.fetchall()]
+            user_count = None
+            if "users" in tables:
+                user_count = (await conn.execute(text("SELECT COUNT(*) FROM users"))).scalar_one()
+            return {
+                "ok": True,
+                "dialect": engine.dialect.name,
+                "database": db_name,
+                "tables": tables,
+                "table_count": len(tables),
+                "users_row_count": user_count,
+            }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+            "dialect": getattr(engine.dialect, "name", "?"),
+        }
 
 
 @app.get("/setup-database", include_in_schema=False)
