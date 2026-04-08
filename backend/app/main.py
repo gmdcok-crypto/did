@@ -218,17 +218,31 @@ if SERVE_PLAYER:
     app.mount("/assets", StaticFiles(directory=PLAYER_ASSETS), name="player_assets")
 
 # CMS 정적 파일(배포 시 cms_dist 빌드 → /admin)
-CMS_DIR = os.path.join(os.path.dirname(__file__), "..", "cms_dist")
+CMS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cms_dist"))
 CMS_INDEX = os.path.join(CMS_DIR, "index.html")
 CMS_ASSETS = os.path.join(CMS_DIR, "assets")
 SERVE_CMS = os.path.isfile(CMS_INDEX) and os.path.isdir(CMS_ASSETS)
 
 if SERVE_CMS:
-    app.mount(
-        "/admin",
-        StaticFiles(directory=CMS_DIR, html=True),
-        name="cms_static",
-    )
+    # /admin/assets 는 파일 그대로. /admin/dashboard 등 SPA 경로는 새로고침 시 index.html (StaticFiles html=True 만으로는 404 나는 환경 대비)
+    app.mount("/admin/assets", StaticFiles(directory=CMS_ASSETS), name="cms_assets")
+
+    @app.get("/admin")
+    @app.get("/admin/")
+    def cms_admin_index():
+        return FileResponse(CMS_INDEX)
+
+    @app.get("/admin/{full_path:path}")
+    def cms_admin_spa(full_path: str):
+        if full_path.startswith("assets/"):
+            raise HTTPException(status_code=404)
+        safe_root = CMS_DIR + os.sep
+        target = os.path.abspath(os.path.join(CMS_DIR, full_path))
+        if not (target == CMS_DIR or target.startswith(safe_root)):
+            raise HTTPException(status_code=404)
+        if os.path.isfile(target):
+            return FileResponse(target)
+        return FileResponse(CMS_INDEX)
 
 
 @app.get("/api/db-status", include_in_schema=False)
