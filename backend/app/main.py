@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import os
 from fastapi import FastAPI
@@ -14,6 +15,8 @@ from app.auth import get_password_hash
 
 
 async def init_db():
+    import app.models  # noqa: F401 — Base.metadata 에 모든 테이블 등록
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # SQLite 기존 DB에만: registered_at 컬럼 추가 (MariaDB/PostgreSQL은 create_all에 이미 포함)
@@ -38,13 +41,28 @@ async def init_db():
             await conn.run_sync(add_registered_at)
 
 
+async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0) -> bool:
+    """MariaDB 기동 지연·네트워크 대비해 create_all 재시도. 성공 시 True."""
+    last_err: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await init_db()
+            if attempt > 1:
+                print(f"init_db succeeded on attempt {attempt}/{max_attempts}")
+            return True
+        except Exception as e:
+            last_err = e
+            print(f"init_db attempt {attempt}/{max_attempts} failed: {e}")
+            if attempt < max_attempts:
+                await asyncio.sleep(delay_seconds)
+    print(f"init_db gave up after {max_attempts} attempts (check DATABASE_URL / MariaDB): {last_err}")
+    return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # DB가 아직 없거나 URL이 틀려도 프로세스는 뜨게 함(Railway 헬스체크·로그 확인용)
-    try:
-        await init_db()
-    except Exception as e:
-        print(f"init_db failed (check DATABASE_URL / MariaDB): {e}")
+    # 테이블 먼저 생성(Railway 등에서 DB 준비 늦어도 재시도)
+    await init_db_with_retry()
     settings = get_settings()
     os.makedirs(settings.upload_dir, exist_ok=True)
     # 관리자 계정이 하나도 없으면 기본 계정 생성 (로그인 가능하도록)
