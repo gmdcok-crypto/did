@@ -1,6 +1,6 @@
 # Railway 배포 (MariaDB + 단일 API 서비스)
 
-**Railway**는 **`nixpacks.toml`** 로 빌드합니다(Docker 없음). DB는 Railway **MySQL/MariaDB 플러그인**의 `MYSQL_URL`(또는 `DATABASE_URL`)을 API 서비스 변수에 연결합니다.
+**Railway**는 저장소 루트 **`Dockerfile`** 로 빌드합니다(`railway.toml` → `builder = "DOCKERFILE"`). 예전 방식은 **`nixpacks.toml`** (Nixpacks)입니다. DB는 **MySQL/MariaDB 플러그인**의 `MYSQL_URL`(또는 `DATABASE_URL`)을 API 서비스 변수에 연결합니다.
 
 | 구성 | 역할 |
 |------|------|
@@ -38,7 +38,7 @@
 
 3. **Deploy**
 
-빌드(`nixpacks.toml`): Python venv → `player` + `cms` 빌드 → `backend/player_dist/`, `backend/cms_dist/` 복사. CMS는 **`VITE_BASE_PATH=/admin/`** 으로 빌드되어 **`/admin/`** 에서 서빙됩니다.
+빌드(`Dockerfile`): Node로 `player`·`cms` 빌드 → `backend/player_dist/`, `backend/cms_dist/` 복사 후 Python 이미지에서 FastAPI 실행. CMS는 **`VITE_BASE_PATH=/admin/`** 으로 빌드되어 **`/admin/`** 에서 서빙됩니다.
 
 **관리자(CMS) 화면 URL**은 별도 서비스가 아니라 **`https://<도메인>/admin/`** 입니다.  
 같은 도메인에서 `/api` 로 API를 쓰므로 **`VITE_API_URL` 설정은 필요 없습니다.**

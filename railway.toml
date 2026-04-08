@@ -1,16 +1,14 @@
-# Railway: Nixpacks (nixpacks.toml). Docker 미사용.
+# Railway: Dockerfile 빌드 (Debian 단일 런타임 — Nixpacks 대비 glibc/libstdc++ 안정)
 # 서비스 Root Directory: 저장소 루트 (/)
-# Public Networking → Target Port 는 비우거나 앱이 bind 하는 PORT 와 같게(기본 동적 PORT). 443 고정 시 헬스 실패 가능.
-# 헬스 경로는 대시보드와 여기 모두 /health. 타임아웃 늘리기: 변수 RAILWAY_HEALTHCHECK_TIMEOUT_SEC
+# Public Networking → Target Port 는 비우거나 앱이 bind 하는 PORT 와 같게
 
 [build]
-builder = "nixpacks"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-# libstdc++.so.6(greenlet): 앞에 붙이면(prepend) Nix Python·glibc 와 섞여 __tunable_is_initialized 오류 → 뒤에만 붙임(append)
-# PORT 비어 있으면 8000, /app vs /app/backend Root Directory 대비
-startCommand = 'bash -c "set -e; if [ -f /app/backend/app/main.py ]; then cd /app/backend; elif [ -f /app/app/main.py ]; then cd /app; else echo railway_start_missing_app_main; ls -la /app /app/backend 2>&1 || true; exit 1; fi; export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu; export PYTHONUNBUFFERED=1; exec /app/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info"'
+# 이미지 WORKDIR=/app/backend, 시스템 Python (venv·LD_LIBRARY_PATH 불필요)
+startCommand = "sh -c 'cd /app/backend && exec python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 healthcheckPath = "/health"
-# 초기 Nixpacks + 첫 DB 풀 연결까지 길어질 수 있음 (기본 300초 초과 시 실패)
-healthcheckTimeout = 1800
+healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"

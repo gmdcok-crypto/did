@@ -1,3 +1,4 @@
+# (선택) Nixpacks 빌드 — Railway 기본은 루트 Dockerfile + railway.toml 의 builder = "DOCKERFILE".
 # Railway (Nixpacks): Docker 없이 백엔드 + 플레이어 정적 빌드를 한 번에 처리합니다.
 # 루트 디렉터리는 저장소 루트(/)로 두세요.
 
