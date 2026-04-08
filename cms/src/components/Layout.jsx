@@ -3,8 +3,8 @@ import { useAuth } from '../lib/auth'
 
 const nav = [
   { to: '/dashboard', label: '대시보드' },
-  { to: '/campaigns', label: '캠페인' },
   { to: '/contents', label: '미디어' },
+  { to: '/campaigns', label: '캠페인' },
   { to: '/schedules', label: '스케줄' },
   { to: '/devices', label: '디바이스' },
 ]
