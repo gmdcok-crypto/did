@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
+from starlette.responses import Response
 from sqlalchemy import text, select
 from app.database import engine, Base, AsyncSessionLocal
 from app.config import get_settings
@@ -109,6 +110,18 @@ app = FastAPI(
     title="PWA Digital Ad CMS API",
     lifespan=lifespan,
 )
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.head("/health")
+def health_head():
+    return Response(status_code=200)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -175,11 +188,6 @@ if SERVE_CMS:
         StaticFiles(directory=CMS_DIR, html=True),
         name="cms_static",
     )
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 
 
 @app.get("/api/db-status", include_in_schema=False)
