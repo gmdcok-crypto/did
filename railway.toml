@@ -1,5 +1,7 @@
 # Railway: Nixpacks (nixpacks.toml). Docker 미사용.
 # 서비스 Root Directory: 저장소 루트 (/)
+# Public Networking → Target Port 는 비우거나 앱이 bind 하는 PORT 와 같게(기본 동적 PORT). 443 고정 시 헬스 실패 가능.
+# 헬스 경로는 대시보드와 여기 모두 /health. 타임아웃 늘리기: 변수 RAILWAY_HEALTHCHECK_TIMEOUT_SEC
 
 [build]
 builder = "nixpacks"

@@ -15,6 +15,44 @@ from app.models import User
 from app.auth import get_password_hash
 
 
+class RailwayHealthMiddleware:
+    """Railway 프로브는 Host/경로가 달라도 /health 만 200이면 됨. CORS·라우터 전에 ASGI에서 바로 응답."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path") or ""
+            method = scope.get("method", "GET")
+            if path == "/health" or path.rstrip("/") == "/health":
+                if method == "HEAD":
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": 200,
+                            "headers": [(b"content-length", b"0")],
+                        }
+                    )
+                    await send({"type": "http.response.body", "body": b"", "more_body": False})
+                    return
+                if method == "GET":
+                    body = b'{"status":"ok"}'
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": 200,
+                            "headers": [
+                                (b"content-type", b"application/json; charset=utf-8"),
+                                (b"content-length", str(len(body)).encode("ascii")),
+                            ],
+                        }
+                    )
+                    await send({"type": "http.response.body", "body": body, "more_body": False})
+                    return
+        await self.app(scope, receive, send)
+
+
 async def init_db():
     import app.models  # noqa: F401 — Base.metadata 에 모든 테이블 등록
 
@@ -154,6 +192,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 가장 마지막에 등록 = ASGI 최외곽. Railway 헬스체크(healthcheck.railway.app)가 스택을 타지 않고 통과
+app.add_middleware(RailwayHealthMiddleware)
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
