@@ -27,6 +27,7 @@ cmds = [
   "rm -rf backend/player_dist/*",
   "cp -r player/dist/. backend/player_dist/",
   "cd cms && VITE_BASE_PATH=/admin/ npm run build",
+  # 테스트 시 CMS 자동 로그인: Railway Variables 에 VITE_SKIP_AUTH=1 (및 선택 VITE_SKIP_AUTH_EMAIL/PASSWORD) 후 빌드
   "mkdir -p backend/cms_dist",
   "rm -rf backend/cms_dist/*",
   "cp -r cms/dist/. backend/cms_dist/",
