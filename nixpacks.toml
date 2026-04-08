@@ -7,7 +7,7 @@ nixPkgs = ["nodejs_20", "python312", "gcc"]
 [phases.install]
 dependsOn = ["setup"]
 cmds = [
-  "pip install -r backend/requirements.txt",
+  "python3 -m pip install -r backend/requirements.txt",
   "cd player && npm ci",
 ]
 
