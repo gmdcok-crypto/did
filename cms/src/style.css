@@ -26,6 +26,10 @@
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
+html {
+  font-size: 18px;
+}
+
 *,
 *::before,
 *::after {
@@ -38,6 +42,7 @@ body {
   background: var(--bg-app);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  line-height: 1.55;
 }
 
 #root {
@@ -84,7 +89,7 @@ a:hover {
 
 .logo {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   letter-spacing: -0.02em;
   color: var(--text);
 }
@@ -100,7 +105,7 @@ a:hover {
   color: var(--text-muted);
   text-decoration: none;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
 }
@@ -124,7 +129,7 @@ a:hover {
 }
 
 .user {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   color: var(--text-dim);
   max-width: 200px;
   overflow: hidden;
@@ -146,7 +151,7 @@ a:hover {
   background: var(--bg-elevated);
   color: var(--text);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   font-weight: 500;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -158,7 +163,7 @@ a:hover {
 
 .btn-sm {
   padding: 0.3rem 0.65rem;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
 }
 
 .btn-primary {
@@ -216,7 +221,7 @@ a:hover {
 
 .login-card h1 {
   margin: 0 0 0.25rem;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
@@ -224,7 +229,7 @@ a:hover {
 .login-sub {
   color: var(--text-muted);
   margin: 0 0 1.5rem;
-  font-size: 0.9rem;
+  font-size: 0.98rem;
 }
 
 .login-card input {
@@ -233,7 +238,7 @@ a:hover {
   margin-bottom: 0.65rem;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 1rem;
   background: var(--bg-input);
   color: var(--text);
 }
@@ -278,7 +283,7 @@ a:hover {
 /* Page */
 .page h1 {
   margin: 0 0 1.25rem;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.03em;
   color: var(--text);
@@ -288,12 +293,12 @@ a:hover {
   padding: 3rem 2rem;
   text-align: center;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .muted {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.98rem;
 }
 
 .muted a {
@@ -335,7 +340,7 @@ a:hover {
 
 .kpi-value {
   display: block;
-  font-size: 1.65rem;
+  font-size: 1.85rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text);
@@ -343,7 +348,7 @@ a:hover {
 }
 
 .kpi-label {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   margin-top: 0.35rem;
   font-weight: 500;
@@ -421,7 +426,7 @@ a:hover {
 .table th {
   background: var(--bg-elevated);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-dim);
@@ -439,7 +444,7 @@ a:hover {
 
 .table .mono {
   font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: var(--text-muted);
 }
 
@@ -476,7 +481,7 @@ a:hover {
 
 .card.section h2 {
   margin: 0 0 0.85rem;
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -568,7 +573,7 @@ a:hover {
 
 .input-sm {
   padding: 0.35rem 0.5rem;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   max-width: 140px;
@@ -577,7 +582,7 @@ a:hover {
 }
 
 .small {
-  font-size: 0.85rem;
+  font-size: 0.92rem;
 }
 
 /* Tabs */
@@ -596,7 +601,7 @@ a:hover {
   padding: 0.55rem 1rem;
   border: none;
   background: none;
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
   cursor: pointer;
   border-radius: 8px 8px 0 0;
@@ -739,7 +744,7 @@ a:hover {
   display: block;
   font-weight: 600;
   margin-bottom: 0.35rem;
-  font-size: 0.9rem;
+  font-size: 0.98rem;
   color: var(--text);
 }
 
