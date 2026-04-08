@@ -74,3 +74,4 @@ Docker 없이 **MariaDB + API 서비스 하나**면 됩니다. Nixpacks가 **플
 - **헬스체크 실패**: Deploy 로그에서 `MYSQL_URL`, `/app/backend`, `/app/.venv`, `PORT` 확인.
 - **`/admin` 404**: 빌드 로그에 `cms` 빌드·`cms_dist` 복사가 있는지 확인.
 - **DB 연결 실패**: MariaDB와 API가 같은 프로젝트인지, `MYSQL_URL` 이 Private 주소인지 확인.
+- **테이블이 비어 있음 / 로그인 불가**: 배포 후 브라우저에서 `https://<API>/api/auth/ensure-seed` 를 열거나, CMS 로그인 화면을 열면(자동 호출) **`create_all` + 기본 그룹 + admin@example.com** 이 생성됩니다.

@@ -44,17 +44,47 @@ async def me(user: User = Depends(get_current_user)):
 
 
 @router.get("/ensure-seed")
-async def ensure_seed(db: AsyncSession = Depends(get_db)):
-    """관리자 계정이 없으면 생성. 로그인 전에 호출해도 됨 (인증 불필요)."""
+async def ensure_seed():
+    """테이블이 없을 때 create_all + 기본 그룹·관리자 시드. CMS 로그인 화면에서 호출 (인증 불필요)."""
+    import app.models  # noqa: F401 — 모든 모델을 metadata에 등록
+
     from app.auth import get_password_hash
-    result = await db.execute(select(User).where(User.email == "admin@example.com"))
-    if result.scalar_one_or_none() is not None:
-        return {"ok": True, "created": False}
-    u = User(
-        email="admin@example.com",
-        hashed_password=get_password_hash("admin123"),
-        role="admin",
-    )
-    db.add(u)
-    await db.commit()
-    return {"ok": True, "created": True}
+    from app.database import engine, AsyncSessionLocal, Base
+    from app.models import DeviceGroup
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    created_admin = False
+    created_group = False
+    async with AsyncSessionLocal() as db:
+        r = await db.execute(select(DeviceGroup).where(DeviceGroup.name == "기본"))
+        if r.scalar_one_or_none() is None:
+            db.add(DeviceGroup(name="기본"))
+            await db.commit()
+            created_group = True
+
+        r = await db.execute(select(User).where(User.email == "admin@example.com"))
+        if r.scalar_one_or_none() is not None:
+            return {
+                "ok": True,
+                "created": False,
+                "created_admin": False,
+                "created_group": created_group,
+            }
+        db.add(
+            User(
+                email="admin@example.com",
+                hashed_password=get_password_hash("admin123"),
+                role="admin",
+            )
+        )
+        await db.commit()
+        created_admin = True
+
+    return {
+        "ok": True,
+        "created": True,
+        "created_admin": created_admin,
+        "created_group": created_group,
+    }
