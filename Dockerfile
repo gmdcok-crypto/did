@@ -16,12 +16,16 @@ ENV VITE_BASE_PATH=/admin/
 RUN npm run build
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app/backend
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# asyncmy 등 휠이 없을 때 소스 빌드 → gcc 필요. --prefer-binary 로 휠 우선.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libstdc++6 \
+    && pip install --no-cache-dir --prefer-binary -r requirements.txt \
+    && apt-get purge -y build-essential \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY backend/ .
 COPY --from=frontend /src/player/dist ./player_dist/
