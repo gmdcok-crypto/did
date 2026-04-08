@@ -61,7 +61,7 @@ export default function Login() {
             연결 다시 확인
           </button>
         )}
-        {backendOk === true && <p className="muted small" style={{ color: '#137333' }}>백엔드 연결됨</p>}
+        {backendOk === true && <p className="muted small text-success">백엔드 연결됨</p>}
         {!seedDone && <p className="muted small">계정 확인 중...</p>}
         <form onSubmit={handleSubmit}>
           {error && <div className="error">{error}</div>}
