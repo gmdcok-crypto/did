@@ -1,9 +1,10 @@
 /* Railway 스타일 다크 CMS — 토큰 기반 */
 :root {
-  --bg-app: #0b0b0d;
-  --bg-surface: #121214;
-  --bg-elevated: #18181b;
-  --bg-input: #0f0f12;
+  /* 짙은 군청색 계열 배경 */
+  --bg-app: #0a1628;
+  --bg-surface: #0f1f35;
+  --bg-elevated: #152a45;
+  --bg-input: #0c1a2e;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.12);
   --text: #f4f4f5;
@@ -204,9 +205,9 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(139, 92, 246, 0.25), transparent),
-    radial-gradient(ellipse 80% 50% at 100% 50%, rgba(59, 130, 246, 0.12), transparent),
-    var(--bg-app);
+  background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(139, 92, 246, 0.18), transparent),
+    radial-gradient(ellipse 80% 50% at 100% 50%, rgba(59, 130, 246, 0.1), transparent),
+    linear-gradient(165deg, #071018 0%, var(--bg-app) 45%, #0d2038 100%);
 }
 
 .login-card {
