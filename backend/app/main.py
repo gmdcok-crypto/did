@@ -67,13 +67,11 @@ async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0)
     return False
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 테이블 먼저 생성(Railway 등에서 DB 준비 늦어도 재시도)
-    await init_db_with_retry()
-    settings = get_settings()
-    os.makedirs(settings.upload_dir, exist_ok=True)
-    # 관리자 계정이 하나도 없으면 기본 계정 생성 (로그인 가능하도록)
+async def _background_startup_db() -> None:
+    """Railway 헬스체크: lifespan 에서 await 하면 포트 오픈이 늦어짐 → 백그라운드에서 create_all·시드."""
+    ok = await init_db_with_retry()
+    if not ok:
+        return
     try:
         async with AsyncSessionLocal() as db:
             r = await db.execute(select(User).limit(1))
@@ -89,8 +87,14 @@ async def lifespan(app: FastAPI):
                 print("Created default admin: admin@example.com / admin123")
     except Exception as e:
         print(f"Startup seed failed (run manually if needed): cd backend && python -m app.init_db — {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    os.makedirs(settings.upload_dir, exist_ok=True)
+    asyncio.create_task(_background_startup_db())
     yield
-    # 재시작/종료 시 DB 연결 정리 (aiomysql Event loop is closed 방지)
     await engine.dispose()
 
 
