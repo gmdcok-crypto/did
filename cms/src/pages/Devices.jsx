@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, API_BASE } from '../lib/api'
+import { useAuth } from '../lib/auth'
 
 export default function Devices() {
+  const { user } = useAuth()
   const [list, setList] = useState([])
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
@@ -10,6 +12,64 @@ export default function Devices() {
   const [newGroupName, setNewGroupName] = useState('')
   const [editingGroupId, setEditingGroupId] = useState(null)
   const [editingGroupName, setEditingGroupName] = useState('')
+  const [regAuthCode, setRegAuthCode] = useState('')
+  const [regUsesDatabase, setRegUsesDatabase] = useState(false)
+  const [regLoading, setRegLoading] = useState(false)
+  const [regSaving, setRegSaving] = useState(false)
+
+  const loadRegistrationCode = () => {
+    if (user?.role !== 'admin') return
+    setRegLoading(true)
+    api('/settings/device-registration')
+      .then((data) => {
+        setRegAuthCode(data?.auth_code ?? '')
+        setRegUsesDatabase(!!data?.uses_database)
+      })
+      .catch(() => {
+        setRegAuthCode('')
+        setRegUsesDatabase(false)
+      })
+      .finally(() => setRegLoading(false))
+  }
+
+  useEffect(() => {
+    loadRegistrationCode()
+  }, [user?.role])
+
+  const saveRegistrationCode = async (e) => {
+    e?.preventDefault?.()
+    if (user?.role !== 'admin') return
+    setRegSaving(true)
+    try {
+      const data = await api('/settings/device-registration', {
+        method: 'PUT',
+        body: JSON.stringify({ auth_code: regAuthCode }),
+      })
+      setRegAuthCode(data?.auth_code ?? '')
+      setRegUsesDatabase(!!data?.uses_database)
+    } catch (err) {
+      alert(err?.message || '저장에 실패했습니다.')
+    } finally {
+      setRegSaving(false)
+    }
+  }
+
+  const clearRegistrationOverride = async () => {
+    if (!window.confirm('DB에 저장된 코드를 지우고 서버 환경 변수의 기본값을 쓰시겠습니까?')) return
+    setRegSaving(true)
+    try {
+      const data = await api('/settings/device-registration', {
+        method: 'PUT',
+        body: JSON.stringify({ auth_code: '' }),
+      })
+      setRegAuthCode(data?.auth_code ?? '')
+      setRegUsesDatabase(!!data?.uses_database)
+    } catch (err) {
+      alert(err?.message || '초기화에 실패했습니다.')
+    } finally {
+      setRegSaving(false)
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -145,6 +205,42 @@ export default function Devices() {
   return (
     <div className="page">
       <h1>디바이스</h1>
+
+      {user?.role === 'admin' && (
+        <section className="card section">
+          <h2>디바이스 등록 인증코드</h2>
+          <p className="muted">
+            플레이어에서 최초 등록할 때 입력하는 코드입니다. 변경 후에는 모든 디스플레이에 새 코드를 알려 주세요.
+          </p>
+          {regLoading ? (
+            <p className="muted">불러오는 중…</p>
+          ) : (
+            <form className="form-inline" onSubmit={saveRegistrationCode} style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+              <input
+                type="text"
+                autoComplete="off"
+                value={regAuthCode}
+                onChange={(e) => setRegAuthCode(e.target.value)}
+                placeholder="인증코드"
+                style={{ minWidth: '12rem' }}
+              />
+              <button type="submit" className="btn btn-primary" disabled={regSaving}>
+                {regSaving ? '저장 중…' : '저장'}
+              </button>
+              {regUsesDatabase && (
+                <button type="button" className="btn" onClick={clearRegistrationOverride} disabled={regSaving}>
+                  DB 저장 지우기 (환경 변수로 복귀)
+                </button>
+              )}
+            </form>
+          )}
+          {!regLoading && !regUsesDatabase && (
+            <p className="muted" style={{ marginTop: '0.5rem' }}>
+              현재 값은 서버 환경 변수(REGISTRATION_AUTH_CODE) 기준입니다. 저장하면 DB에 고정됩니다.
+            </p>
+          )}
+        </section>
+      )}
 
       {/* 디바이스 그룹 */}
       <section className="card section">

@@ -6,6 +6,7 @@ from app.models.campaign import Campaign, CampaignContent  # noqa
 from app.models.content import Content  # noqa
 from app.models.schedule import Schedule, ScheduleSlot  # noqa
 from app.models.event import PlaybackEvent  # noqa
+from app.models.app_setting import AppSetting  # noqa
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "Schedule",
     "ScheduleSlot",
     "PlaybackEvent",
+    "AppSetting",
 ]

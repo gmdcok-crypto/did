@@ -7,7 +7,7 @@ from typing import Optional
 from app.database import get_db
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
-from app.config import get_settings
+from app.registration_code import get_effective_registration_auth_code
 from app.sse_broadcast import subscribe, unsubscribe, broadcast_device_list_updated, broadcast_schedule_updated
 import uuid
 from datetime import datetime
@@ -45,8 +45,8 @@ async def register_device(
     data: DeviceRegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    settings = get_settings()
-    if not settings.registration_auth_code or (data.auth_code or "").strip() != settings.registration_auth_code:
+    expected = await get_effective_registration_auth_code(db)
+    if not expected or (data.auth_code or "").strip() != expected:
         raise HTTPException(status_code=403, detail="인증코드가 올바르지 않습니다.")
 
     # 재등록: previous_device_id가 있고 해당 기기가 있으면 갱신 후 같은 ID 반환 (그룹에 중복 추가 안 됨)
