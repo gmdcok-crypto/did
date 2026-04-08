@@ -13,6 +13,8 @@ backend/.env
 dist/
 dist-ssr/
 *.local
+backend/player_dist/*
+!backend/player_dist/.gitkeep
 backend/__pycache__/
 backend/app/__pycache__/
 backend/app/**/__pycache__/

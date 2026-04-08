@@ -118,11 +118,8 @@ async def list_devices(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Device)
-        .where(Device.registered_at.isnot(None))
-        .order_by(Device.id)
-    )
+    """디바이스 전체 목록. registered_at 이 NULL이어도 표시(기존 DB 행이 보이도록)."""
+    result = await db.execute(select(Device).order_by(Device.id))
     devices = result.scalars().all()
     return [
         DeviceListItem(

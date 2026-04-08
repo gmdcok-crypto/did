@@ -1,0 +1,11 @@
+# Railway 배포 (Docker 미사용, Nixpacks 빌드는 nixpacks.toml 참고)
+# 서비스 루트 디렉터리: 저장소 루트 (/)
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"

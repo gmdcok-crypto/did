@@ -13,7 +13,7 @@ export default function Contents() {
   const load = () => {
     setLoading(true)
     api('/contents')
-      .then(setList)
+      .then((data) => setList(Array.isArray(data) ? data : []))
       .catch(() => setList([]))
       .finally(() => setLoading(false))
   }

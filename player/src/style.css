@@ -63,6 +63,25 @@ body {
   background: #111;
 }
 
+.media-wrap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: mediaFadeIn 0.15s ease-out;
+  z-index: 1;
+}
+
+.media-wrap-prev {
+  z-index: 0;
+  animation: none;
+}
+
+@keyframes mediaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .zone-placeholder {
   width: 100%;
   height: 100%;

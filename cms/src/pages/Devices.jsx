@@ -31,7 +31,7 @@ export default function Devices() {
 
   // SSE: 디바이스 등록/수정 시 서버가 보내는 신호 수신 → 목록 갱신
   useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+    const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8000/api')
     const es = new EventSource(`${apiBase}/devices/events`)
     es.onmessage = () => load()
     es.onerror = () => es.close()

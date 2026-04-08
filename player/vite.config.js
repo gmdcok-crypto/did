@@ -8,8 +8,10 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const certDir = path.resolve(__dirname, '../backend/certs')
 const hasCerts = fs.existsSync(path.join(certDir, 'key.pem')) && fs.existsSync(path.join(certDir, 'cert.pem'))
-// Docker 백엔드(http) 사용 시: VITE_DEV_HTTP=1 로 HTTP 서버로 띄우면 혼합 콘텐츠 방지
+// 로컬 개발 기본: 백엔드 HTTP. HTTPS 백엔드 쓸 때만 VITE_BACKEND_HTTPS=1
 const useHttp = process.env.VITE_DEV_HTTP === '1' || process.env.USE_HTTP === '1'
+const backendHttps = process.env.VITE_BACKEND_HTTPS === '1'
+const backendTarget = backendHttps ? 'https://127.0.0.1:8000' : 'http://127.0.0.1:8000'
 
 export default defineConfig({
   plugins: [
@@ -19,14 +21,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
+          // 스케줄은 캐시하지 않음: NetworkFirst(5초 타임아웃) 시 옛 JSON이 계속 나와 기기 삭제/재등록이 막힘
           {
             urlPattern: /\/api\/player\/schedule/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'schedule-cache',
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 5 },
-            },
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /\/uploads\//,
@@ -63,12 +61,12 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: (useHttp || !hasCerts) ? 'http://127.0.0.1:8000' : 'https://127.0.0.1:8000',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: (useHttp || !hasCerts) ? 'http://127.0.0.1:8000' : 'https://127.0.0.1:8000',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },

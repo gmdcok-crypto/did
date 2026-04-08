@@ -1,0 +1,18 @@
+{
+  "name": "디지털 광고 CMS",
+  "short_name": "광고 CMS",
+  "description": "디지털 광고 CMS 관리자",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#2563eb",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,5 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getDeviceId, setDeviceId, registerDevice, fetchSchedule, sendEvents, getScheduleEventsUrl } from './lib/api'
+import {
+  getDeviceId,
+  setDeviceId,
+  clearDeviceId,
+  registerDevice,
+  fetchSchedule,
+  sendEvents,
+  getScheduleEventsUrl,
+  getMediaBaseUrl,
+  DEVICE_NOT_FOUND,
+  purgePlayerScheduleCaches,
+} from './lib/api'
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
@@ -41,9 +52,27 @@ export default function App() {
       setError(null)
       const data = await fetchSchedule(deviceId, forceRefresh ? { cacheBust: true } : {})
       setSchedule(data)
+      if (data) {
+        sessionStorage.setItem('did_schedule_cache', JSON.stringify(data))
+        try { localStorage.setItem('did_schedule_cache', JSON.stringify(data)) } catch (_) {}
+      }
       return data
     } catch (e) {
-      const cached = sessionStorage.getItem('did_schedule_cache')
+      // CMS에서 기기 삭제됨: 로컬/캐시로 옛 스케줄 재생하지 않고 재등록 유도
+      if (e.code === DEVICE_NOT_FOUND) {
+        clearDeviceId()
+        sessionStorage.removeItem('did_schedule_cache')
+        try {
+          localStorage.removeItem('did_schedule_cache')
+        } catch (_) {}
+        await purgePlayerScheduleCaches()
+        setDeviceIdState(null)
+        setSchedule(null)
+        setError(null)
+        setShowSettings(true)
+        return null
+      }
+      const cached = sessionStorage.getItem('did_schedule_cache') || (typeof localStorage !== 'undefined' ? localStorage.getItem('did_schedule_cache') : null)
       if (cached && !forceRefresh) {
         try {
           const parsed = JSON.parse(cached)
@@ -55,6 +84,11 @@ export default function App() {
       setError(e.message)
     }
   }, [deviceId])
+
+  // 옛 PWA 설정(NetworkFirst 스케줄 캐시) 잔여분 제거 — 한 번 로드 시 정리
+  useEffect(() => {
+    purgePlayerScheduleCaches()
+  }, [])
 
   // URL에 device_id가 있으면 적용 (CMS에서 링크로 넣을 때)
   useEffect(() => {
@@ -73,7 +107,10 @@ export default function App() {
   useEffect(() => {
     if (!deviceId) return
     loadSchedule().then((data) => {
-      if (data) sessionStorage.setItem('did_schedule_cache', JSON.stringify(data))
+      if (data) {
+        sessionStorage.setItem('did_schedule_cache', JSON.stringify(data))
+        try { localStorage.setItem('did_schedule_cache', JSON.stringify(data)) } catch (_) {}
+      }
     })
     const t = setInterval(loadSchedule, POLL_INTERVAL_MS)
     let es = null
@@ -277,7 +314,9 @@ export default function App() {
           )}
         </div>
         <p style={{ color: '#aaa', margin: 0 }}>디바이스가 등록되지 않았습니다.</p>
-        <p className="small" style={{ color: '#666' }}>우측 상단 ⚙ 버튼을 눌러 인증코드로 등록하세요.</p>
+        <p className="small" style={{ color: '#666' }}>
+          우측 상단 ⚙에서 인증코드로 등록하세요. CMS에서 기기를 삭제한 경우에도 이 화면으로 돌아와 다시 등록할 수 있습니다.
+        </p>
       </div>
     )
   }
@@ -289,52 +328,6 @@ export default function App() {
   return (
     <div className="player-full">
       {!online && <div className="offline-banner">오프라인 재생 중</div>}
-      {/* 설정: 인증코드·이름·위치로 등록 / 스케줄 새로고침 */}
-      <div className="player-settings-wrap">
-        <button type="button" className="player-settings-btn" onClick={() => loadSchedule(true)} title="스케줄 새로고침">
-          ⟳
-        </button>
-        <button type="button" className="player-settings-btn" onClick={openSettings} title="디바이스 등록">
-          ⚙
-        </button>
-        {showSettings && (
-          <div className="player-settings-panel">
-            <p className="player-settings-hint" style={{ marginBottom: '0.75rem' }}>
-              인증코드·이름·위치를 입력하고 등록하면 디바이스 목록에 표시됩니다.
-            </p>
-            <label>인증코드 (필수)</label>
-            <input
-              type="text"
-              value={registerAuthCode}
-              onChange={(e) => setRegisterAuthCode(e.target.value)}
-              placeholder="회사에서 안내한 인증코드"
-            />
-            <label>이름</label>
-            <input
-              type="text"
-              value={registerName}
-              onChange={(e) => setRegisterName(e.target.value)}
-              placeholder="예: 1층 로비 키오스크"
-            />
-            <label>위치</label>
-            <input
-              type="text"
-              value={registerLocation}
-              onChange={(e) => setRegisterLocation(e.target.value)}
-              placeholder="예: 본점 1층"
-            />
-            <div className="player-settings-actions">
-              <button type="button" className="btn btn-sm btn-primary" onClick={doRegister}>
-                등록
-              </button>
-              <button type="button" className="btn btn-sm" onClick={() => setShowSettings(false)}>
-                닫기
-              </button>
-            </div>
-            {registerError && <p className="player-settings-error">{registerError}</p>}
-          </div>
-        )}
-      </div>
       <div
         className="player-zones"
         style={{
@@ -358,6 +351,7 @@ export default function App() {
             zone={zone}
             reportEvent={reportEvent}
             currentContentRef={currentContentRef}
+            mediaBaseUrl={getMediaBaseUrl()}
           />
         ))}
       </div>
@@ -365,9 +359,12 @@ export default function App() {
   )
 }
 
-function Zone({ zone, reportEvent, currentContentRef }) {
+function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
   const { content_type, items } = zone
   const [index, setIndex] = useState(0)
+  const [prevIndex, setPrevIndex] = useState(null)
+  const prevIndexRef = useRef(index)
+  const clearPrevTimerRef = useRef(null)
   const item = items[index % (items.length || 1)]
   const duration = (item?.duration_sec || 10) * 1000
 
@@ -379,6 +376,30 @@ function Zone({ zone, reportEvent, currentContentRef }) {
     return () => clearInterval(t)
   }, [items?.length, duration])
 
+  const clearPrevWhenReady = useCallback(() => {
+    if (clearPrevTimerRef.current) {
+      clearTimeout(clearPrevTimerRef.current)
+      clearPrevTimerRef.current = null
+    }
+    setPrevIndex(null)
+  }, [])
+
+  useEffect(() => {
+    if (prevIndexRef.current !== index) {
+      setPrevIndex(prevIndexRef.current)
+      prevIndexRef.current = index
+      if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
+      const isVideo = item?.type === 'video'
+      clearPrevTimerRef.current = setTimeout(() => {
+        clearPrevTimerRef.current = null
+        setPrevIndex(null)
+      }, isVideo ? 8000 : 180)
+      return () => {
+        if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
+      }
+    }
+  }, [index, item?.type])
+
   if (content_type === 'placeholder' || !items?.length) {
     return (
       <div className="zone zone-placeholder">
@@ -389,19 +410,55 @@ function Zone({ zone, reportEvent, currentContentRef }) {
 
   if (!item) return null
 
+  const prevItem = prevIndex != null ? items[prevIndex % items.length] : null
+  const nextItem = items[(index + 1) % items.length]
+
   return (
     <div className="zone">
-      <MediaBlock
-        item={item}
-        reportEvent={reportEvent}
-        currentContentRef={currentContentRef}
-      />
+      {prevItem && prevItem.id !== item?.id && (
+        <div className="media-wrap media-wrap-prev">
+          <MediaBlock
+            item={prevItem}
+            reportEvent={reportEvent}
+            currentContentRef={currentContentRef}
+            mediaBaseUrl={mediaBaseUrl}
+          />
+        </div>
+      )}
+      <div className="media-wrap">
+        <MediaBlock
+          item={item}
+          reportEvent={reportEvent}
+          currentContentRef={currentContentRef}
+          mediaBaseUrl={mediaBaseUrl}
+          onReady={clearPrevWhenReady}
+        />
+      </div>
+      {nextItem && nextItem.type === 'video' && nextItem.id !== item?.id && (
+        <NextVideoPreload item={nextItem} mediaBaseUrl={mediaBaseUrl} />
+      )}
     </div>
   )
 }
 
-function MediaBlock({ item, reportEvent, currentContentRef }) {
+function NextVideoPreload({ item, mediaBaseUrl }) {
+  const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
+  if (!url) return null
+  return (
+    <video
+      src={url}
+      preload="auto"
+      muted
+      playsInline
+      style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+      aria-hidden
+    />
+  )
+}
+
+function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady }) {
   const hasReported = useRef(false)
+  const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
 
   useEffect(() => {
     if (hasReported.current) return
@@ -416,11 +473,14 @@ function MediaBlock({ item, reportEvent, currentContentRef }) {
     return (
       <video
         className="media media-video"
-        src={item.url}
+        src={url}
         autoPlay
         muted
         loop
         playsInline
+        preload="auto"
+        onCanPlay={() => onReady?.()}
+        onLoadedData={() => onReady?.()}
         onError={() => reportEvent(item.id, 'error')}
       />
     )
@@ -430,8 +490,9 @@ function MediaBlock({ item, reportEvent, currentContentRef }) {
     return (
       <img
         className="media media-image"
-        src={item.url}
+        src={url}
         alt=""
+        onLoad={() => onReady?.()}
         onError={() => reportEvent(item.id, 'error')}
       />
     )
@@ -441,8 +502,9 @@ function MediaBlock({ item, reportEvent, currentContentRef }) {
     return (
       <iframe
         className="media media-html"
-        src={item.url}
+        src={url}
         title=""
+        onLoad={() => onReady?.()}
       />
     )
   }

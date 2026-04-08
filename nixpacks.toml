@@ -1,0 +1,21 @@
+# Railway (Nixpacks): Docker 없이 백엔드 + 플레이어 정적 빌드를 한 번에 처리합니다.
+# 루트 디렉터리는 저장소 루트(/)로 두세요.
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "python312", "gcc"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = [
+  "pip install -r backend/requirements.txt",
+  "cd player && npm ci",
+]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = [
+  "cd player && npm run build",
+  "mkdir -p backend/player_dist",
+  "rm -rf backend/player_dist/*",
+  "cp -r player/dist/. backend/player_dist/",
+]

@@ -32,7 +32,7 @@ class ContentItem(BaseModel):
     type: str
     url: str
     duration_sec: int
-    name: str
+    name: Optional[str] = ""  # DB에 NULL일 수 있음
 
     class Config:
         from_attributes = True
@@ -82,7 +82,17 @@ async def list_contents(
     user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Content).order_by(Content.id.desc()))
-    return result.scalars().all()
+    rows = result.scalars().all()
+    return [
+        ContentItem(
+            id=c.id,
+            type=c.type or "image",
+            url=c.url or "",
+            duration_sec=c.duration_sec if c.duration_sec is not None else 10,
+            name=c.name if c.name is not None else "",
+        )
+        for c in rows
+    ]
 
 
 @router.post("", response_model=ContentItem)

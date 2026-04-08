@@ -124,6 +124,7 @@ npm run dev
 
 ## 문서
 
+- [Railway 배포 (Docker 없음, MariaDB)](docs/railway-deploy.md)
 - [기술 스펙 및 시스템 흐름](docs/PWA-Digital-Ad-CMS-Spec.md)
 - [Mermaid 흐름도](docs/system-flow-mermaid.md)
 
