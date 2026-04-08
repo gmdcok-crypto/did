@@ -7,9 +7,9 @@
 builder = "nixpacks"
 
 [deploy]
-# LD_LIBRARY_PATH 에 Debian /usr/lib 를 넣으면 Nix Python 과 glibc 가 섞여 __tunable_is_initialized 오류 남 — 넣지 않음 (nixpacks.toml 의 nixLibs/apt 로 greenlet 대응)
+# libstdc++.so.6(greenlet): 앞에 붙이면(prepend) Nix Python·glibc 와 섞여 __tunable_is_initialized 오류 → 뒤에만 붙임(append)
 # PORT 비어 있으면 8000, /app vs /app/backend Root Directory 대비
-startCommand = 'bash -c "set -e; if [ -f /app/backend/app/main.py ]; then cd /app/backend; elif [ -f /app/app/main.py ]; then cd /app; else echo railway_start_missing_app_main; ls -la /app /app/backend 2>&1 || true; exit 1; fi; export PYTHONUNBUFFERED=1; exec /app/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info"'
+startCommand = 'bash -c "set -e; if [ -f /app/backend/app/main.py ]; then cd /app/backend; elif [ -f /app/app/main.py ]; then cd /app; else echo railway_start_missing_app_main; ls -la /app /app/backend 2>&1 || true; exit 1; fi; export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu; export PYTHONUNBUFFERED=1; exec /app/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info"'
 healthcheckPath = "/health"
 # 초기 Nixpacks + 첫 DB 풀 연결까지 길어질 수 있음 (기본 300초 초과 시 실패)
 healthcheckTimeout = 1200
