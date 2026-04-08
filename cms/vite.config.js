@@ -13,6 +13,9 @@ const useHttp = process.env.VITE_DEV_HTTP === '1' || process.env.USE_HTTP === '1
 const backendHttps = process.env.VITE_BACKEND_HTTPS === '1'
 const backendTarget = backendHttps ? 'https://localhost:8000' : 'http://localhost:8000'
 
+// 프로덕션: 백엔드가 /admin 에 CMS 정적 서빙 시 (예: Railway 단일 서비스)
+const base = process.env.VITE_BASE_PATH || '/'
+
 // 백엔드가 HTTPS(자체서명)일 때 프록시가 인증서 검증 통과하도록
 const isBackendHttps = backendTarget.startsWith('https://')
 const proxyOptions = {
@@ -23,6 +26,7 @@ const proxyOptions = {
 }
 
 export default defineConfig({
+  base,
   plugins: [react()],
   server: {
     port: 5173,

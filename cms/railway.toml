@@ -1,5 +1,5 @@
-# Railway: 서비스 Settings → Root Directory = cms
-# 빌드 시 VITE_API_URL 이 있어야 API 주소가 번들에 들어갑니다.
+# (선택) CMS만 별도 서비스로 올릴 때 사용. 기본은 API 서비스가 /admin 에 CMS를 같이 서빙.
+# 빌드 시 VITE_API_URL=https://<API>/api 필요.
 
 [build]
 builder = "nixpacks"

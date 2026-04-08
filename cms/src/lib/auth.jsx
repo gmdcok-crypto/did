@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8000/api')
+import { API_BASE } from './api'
 
 const AuthContext = createContext(null)
 
@@ -63,7 +62,7 @@ export function AuthProvider({ children }) {
       return data
     } catch (err) {
       if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-        throw new Error('서버에 연결할 수 없습니다. 백엔드(http://localhost:8000)가 실행 중인지 확인하세요.')
+        throw new Error('서버에 연결할 수 없습니다. API 주소와 네트워크를 확인하세요.')
       }
       throw err
     }

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8000/api')
-const BACKEND_ORIGIN = API_BASE.replace(/\/api\/?$/, '')
+import { API_BASE } from '../lib/api'
 
 export default function Login() {
   const [email, setEmail] = useState('')

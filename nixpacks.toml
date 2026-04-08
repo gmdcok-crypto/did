@@ -13,6 +13,7 @@ cmds = [
   "/app/.venv/bin/pip install --upgrade pip",
   "/app/.venv/bin/pip install -r backend/requirements.txt",
   "cd player && npm ci --ignore-engines",
+  "cd cms && npm ci --ignore-engines",
 ]
 
 [phases.build]
@@ -22,4 +23,8 @@ cmds = [
   "mkdir -p backend/player_dist",
   "rm -rf backend/player_dist/*",
   "cp -r player/dist/. backend/player_dist/",
+  "cd cms && VITE_BASE_PATH=/admin/ npm run build",
+  "mkdir -p backend/cms_dist",
+  "rm -rf backend/cms_dist/*",
+  "cp -r cms/dist/. backend/cms_dist/",
 ]

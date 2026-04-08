@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../lib/api'
+import { api, API_BASE } from '../lib/api'
 
 export default function Devices() {
   const [list, setList] = useState([])
@@ -31,8 +31,7 @@ export default function Devices() {
 
   // SSE: 디바이스 등록/수정 시 서버가 보내는 신호 수신 → 목록 갱신
   useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8000/api')
-    const es = new EventSource(`${apiBase}/devices/events`)
+    const es = new EventSource(`${API_BASE}/devices/events`)
     es.onmessage = () => load()
     es.onerror = () => es.close()
     return () => es.close()
@@ -83,7 +82,7 @@ export default function Devices() {
     } catch (e) {
       const msg = e?.message || String(e)
       if (msg === 'Failed to fetch' || msg.includes('fetch')) {
-        alert('삭제 요청이 실패했습니다. 백엔드(http://localhost:8000)가 실행 중인지 확인해 주세요.')
+        alert('삭제 요청이 실패했습니다. API 서버 연결을 확인해 주세요.')
       } else {
         alert(msg)
       }

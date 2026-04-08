@@ -127,6 +127,20 @@ SERVE_PLAYER = os.path.isfile(PLAYER_INDEX) and os.path.isdir(PLAYER_ASSETS)
 if SERVE_PLAYER:
     app.mount("/assets", StaticFiles(directory=PLAYER_ASSETS), name="player_assets")
 
+# CMS 정적 파일(배포 시 cms_dist 빌드 → /admin)
+CMS_DIR = os.path.join(os.path.dirname(__file__), "..", "cms_dist")
+CMS_INDEX = os.path.join(CMS_DIR, "index.html")
+CMS_ASSETS = os.path.join(CMS_DIR, "assets")
+SERVE_CMS = os.path.isfile(CMS_INDEX) and os.path.isdir(CMS_ASSETS)
+
+if SERVE_CMS:
+    app.mount(
+        "/admin",
+        StaticFiles(directory=CMS_DIR, html=True),
+        name="cms_static",
+    )
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -136,6 +150,8 @@ if SERVE_PLAYER:
     @app.get("/{full_path:path}")
     def serve_player_spa(full_path: str):
         if full_path.startswith("api/") or full_path.startswith("uploads/") or full_path.startswith("assets/"):
+            raise HTTPException(status_code=404)
+        if full_path.startswith("admin") or full_path.startswith("admin/"):
             raise HTTPException(status_code=404)
         if full_path in ("health", "docs", "openapi.json", "redoc"):
             raise HTTPException(status_code=404)
