@@ -106,6 +106,27 @@ export function getScheduleEventsUrl() {
   return `${API_BASE}/player/events`
 }
 
+export async function pollLiveScreenCapture(deviceId) {
+  const url = new URL(`${API_BASE}/player/live-screen-poll`)
+  url.searchParams.set('device_id', deviceId)
+  url.searchParams.set('_', String(Date.now()))
+  const res = await fetch(url.toString(), { cache: 'no-store' })
+  if (!res.ok) return { capture: false }
+  return res.json()
+}
+
+export async function uploadLiveScreen(deviceId, ticket, blob) {
+  const fd = new FormData()
+  fd.append('device_id', deviceId)
+  fd.append('ticket', ticket)
+  fd.append('file', blob, 'screen.jpg')
+  const res = await fetch(`${API_BASE}/player/live-screen-upload`, {
+    method: 'POST',
+    body: fd,
+  })
+  return res.ok
+}
+
 export async function sendEvents(deviceId, events) {
   const res = await fetch(`${API_BASE}/events/batch`, {
     method: 'POST',

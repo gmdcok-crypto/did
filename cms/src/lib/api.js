@@ -1,5 +1,15 @@
 export const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
+/** `/uploads/...` 절대 URL (로컬은 Vite 프록시 origin, 운영은 API와 동일 호스트) */
+export function getUploadsOrigin() {
+  const apiUrl = import.meta.env.VITE_API_URL
+  if (apiUrl && String(apiUrl).trim()) {
+    return String(apiUrl).replace(/\/api\/?$/i, '').replace(/\/$/, '')
+  }
+  if (typeof window !== 'undefined') return window.location.origin.replace(/\/$/, '')
+  return ''
+}
+
 const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized'
 
 export function getToken() {

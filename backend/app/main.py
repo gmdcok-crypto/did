@@ -87,6 +87,37 @@ async def init_db():
                     pass
             await conn.run_sync(add_registered_at)
 
+            def add_device_live_screen_cols(sync_conn):
+                for stmt in (
+                    "ALTER TABLE devices ADD COLUMN live_screen_pending BOOLEAN DEFAULT 0",
+                    "ALTER TABLE devices ADD COLUMN live_screen_ticket VARCHAR(64)",
+                    "ALTER TABLE devices ADD COLUMN live_screen_last_ticket VARCHAR(64)",
+                    "ALTER TABLE devices ADD COLUMN live_screen_path VARCHAR(512)",
+                    "ALTER TABLE devices ADD COLUMN live_screen_at DATETIME",
+                ):
+                    try:
+                        sync_conn.execute(text(stmt))
+                    except Exception:
+                        pass
+
+            await conn.run_sync(add_device_live_screen_cols)
+
+        if engine.dialect.name in ("mysql", "mariadb"):
+            def add_device_live_screen_cols_mysql(sync_conn):
+                for stmt in (
+                    "ALTER TABLE devices ADD COLUMN live_screen_pending TINYINT(1) NOT NULL DEFAULT 0",
+                    "ALTER TABLE devices ADD COLUMN live_screen_ticket VARCHAR(64) NULL",
+                    "ALTER TABLE devices ADD COLUMN live_screen_last_ticket VARCHAR(64) NULL",
+                    "ALTER TABLE devices ADD COLUMN live_screen_path VARCHAR(512) NULL",
+                    "ALTER TABLE devices ADD COLUMN live_screen_at DATETIME NULL",
+                ):
+                    try:
+                        sync_conn.execute(text(stmt))
+                    except Exception:
+                        pass
+
+            await conn.run_sync(add_device_live_screen_cols_mysql)
+
 
 async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0) -> bool:
     """MySQL/MariaDB 기동 지연·네트워크 대비해 create_all 재시도. 성공 시 True."""

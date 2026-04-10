@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { api, API_BASE } from '../lib/api'
+import { useEffect, useState, useRef } from 'react'
+import { api, API_BASE, getUploadsOrigin } from '../lib/api'
 import { useAuth } from '../lib/auth'
 
 export default function Devices() {
@@ -16,6 +16,14 @@ export default function Devices() {
   const [regUsesDatabase, setRegUsesDatabase] = useState(false)
   const [regLoading, setRegLoading] = useState(false)
   const [regSaving, setRegSaving] = useState(false)
+  const [liveModal, setLiveModal] = useState({
+    open: false,
+    title: '',
+    loading: false,
+    error: null,
+    imageSrc: null,
+  })
+  const livePollAbortRef = useRef(0)
 
   const loadRegistrationCode = () => {
     if (user?.role !== 'admin') return
@@ -200,7 +208,59 @@ export default function Devices() {
     }
   }
 
+  const closeLiveModal = () => {
+    livePollAbortRef.current += 1
+    setLiveModal({
+      open: false,
+      title: '',
+      loading: false,
+      error: null,
+      imageSrc: null,
+    })
+  }
+
+  const openLiveScreen = async (d) => {
+    const myAbort = (livePollAbortRef.current += 1)
+    setLiveModal({
+      open: true,
+      title: d.name || d.device_id,
+      loading: true,
+      error: null,
+      imageSrc: null,
+    })
+    try {
+      const req = await api(`/devices/${d.id}/live-screen/request`, { method: 'POST' })
+      const ticket = req?.ticket
+      if (!ticket) throw new Error('요청 티켓을 받지 못했습니다.')
+      if (livePollAbortRef.current !== myAbort) return
+      const deadline = Date.now() + 52000
+      while (Date.now() < deadline) {
+        if (livePollAbortRef.current !== myAbort) return
+        await new Promise((r) => setTimeout(r, 1800))
+        const st = await api(`/devices/${d.id}/live-screen/status`)
+        if (livePollAbortRef.current !== myAbort) return
+        if (st?.last_ticket === ticket && st?.image_url) {
+          const src = `${getUploadsOrigin()}${st.image_url}?t=${Date.now()}`
+          setLiveModal((m) => ({ ...m, loading: false, imageSrc: src }))
+          return
+        }
+      }
+      setLiveModal((m) => ({
+        ...m,
+        loading: false,
+        error:
+          '시간 내에 화면을 받지 못했습니다. 기기 전원·네트워크·플레이어 실행을 확인하세요.',
+      }))
+    } catch (e) {
+      if (livePollAbortRef.current !== myAbort) return
+      setLiveModal((m) => ({ ...m, loading: false, error: e?.message || '요청 실패' }))
+    }
+  }
+
   if (loading) return <div className="loading">로딩 중...</div>
+
+  const defaultGroup = groups.find((g) => g.name === '기본')
+  const defaultGroupId = defaultGroup?.id ?? 1
 
   return (
     <div className="page">
@@ -232,10 +292,12 @@ export default function Devices() {
         )}
 
         <section className="card section devices-section-groups">
-          <h2>디바이스 그룹</h2>
+          <div className="devices-groups-title-row">
+            <h2>디바이스 그룹</h2>
+            <span className="group-id devices-groups-default-id">기본 ID:{defaultGroupId}</span>
+          </div>
           <ul className="group-list">
-            {groups.length === 0 ? null : (
-            groups.map((g) => (
+            {groups.map((g) => (
               <li key={g.id}>
                 {editingGroupId === g.id ? (
                   <>
@@ -270,20 +332,22 @@ export default function Devices() {
                   </>
                 )}
               </li>
-            ))
-            )}
+            ))}
+            <li className="group-list-add-row">
+              <form onSubmit={addGroup} className="form-inline group-list-add-form">
+                <input
+                  type="text"
+                  className="input-sm"
+                  placeholder="그룹 이름"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                />
+                <button type="submit" className="btn btn-sm">
+                  추가
+                </button>
+              </form>
+            </li>
           </ul>
-          <form onSubmit={addGroup} className="form-inline">
-            <input
-              type="text"
-              placeholder="그룹 이름"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-            />
-            <button type="submit" className="btn btn-primary">
-              그룹 추가
-            </button>
-          </form>
         </section>
       </div>
 
@@ -365,6 +429,9 @@ export default function Devices() {
                         <td><span className={`status status-${d.status}`}>{d.status}</span></td>
                         <td>{d.last_seen ? new Date(d.last_seen).toLocaleString('ko-KR') : '-'}</td>
                         <td>
+                          <button type="button" className="btn btn-sm" onClick={() => openLiveScreen(d)}>
+                            실시간 화면
+                          </button>
                           <button type="button" className="btn btn-sm" onClick={() => startEdit(d)}>
                             수정
                           </button>
@@ -381,6 +448,36 @@ export default function Devices() {
           </table>
         </div>
       </section>
+
+      {liveModal.open && (
+        <div
+          className="live-screen-overlay"
+          role="presentation"
+          onClick={closeLiveModal}
+        >
+          <div
+            className="live-screen-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="live-screen-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="live-screen-modal-head">
+              <h3 id="live-screen-title">{liveModal.title}</h3>
+              <button type="button" className="btn btn-sm" onClick={closeLiveModal}>
+                닫기
+              </button>
+            </div>
+            {liveModal.loading && <p className="live-screen-modal-status">기기에서 화면을 가져오는 중…</p>}
+            {liveModal.error && <p className="live-screen-modal-error">{liveModal.error}</p>}
+            {liveModal.imageSrc && (
+              <div className="live-screen-modal-img-wrap">
+                <img src={liveModal.imageSrc} alt="디바이스 화면 캡처" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

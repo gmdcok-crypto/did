@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,6 +11,7 @@ from urllib.parse import urlparse
 import asyncio
 from app.database import get_db
 from app.models import Device, Schedule, Campaign, CampaignContent, Content
+from app.config import get_settings
 from app.sse_broadcast import subscribe_schedule, unsubscribe_schedule, broadcast_device_list_updated
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -237,3 +240,66 @@ async def get_schedule(
         layout_config=schedule.layout_config,
         zones=zones,
     )
+
+
+class LiveScreenPollResponse(BaseModel):
+    capture: bool
+    ticket: Optional[str] = None
+
+
+@router.get("/live-screen-poll", response_model=LiveScreenPollResponse)
+async def live_screen_poll(device_id: str, db: AsyncSession = Depends(get_db)):
+    """플레이어가 주기적으로 호출. 캡처 요청이 있으면 capture=true 와 ticket 반환."""
+    result = await db.execute(select(Device).where(Device.device_id == device_id))
+    device = result.scalar_one_or_none()
+    if not device:
+        return LiveScreenPollResponse(capture=False)
+    if device.live_screen_pending and (device.live_screen_ticket or "").strip():
+        return LiveScreenPollResponse(capture=True, ticket=device.live_screen_ticket)
+    return LiveScreenPollResponse(capture=False)
+
+
+@router.post("/live-screen-upload")
+async def live_screen_upload(
+    device_id: str = Form(),
+    ticket: str = Form(),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """플레이어가 캡처한 JPEG 업로드 (device_id·ticket 검증)."""
+    result = await db.execute(select(Device).where(Device.device_id == device_id.strip()))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    t = (ticket or "").strip()
+    if not device.live_screen_pending or (device.live_screen_ticket or "") != t:
+        raise HTTPException(status_code=400, detail="유효하지 않은 캡처 요청입니다.")
+
+    raw = await file.read()
+    max_bytes = 6 * 1024 * 1024
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=413, detail="이미지가 너무 큽니다.")
+    if len(raw) < 32:
+        raise HTTPException(status_code=400, detail="빈 이미지입니다.")
+
+    settings = get_settings()
+    base = Path(settings.upload_dir)
+    shot_dir = base / "screenshots"
+    shot_dir.mkdir(parents=True, exist_ok=True)
+    rel = f"screenshots/{device.device_id}.jpg"
+    dest = base / rel
+    if device.live_screen_path and device.live_screen_path != rel:
+        try:
+            old = base / device.live_screen_path
+            if old.is_file():
+                old.unlink()
+        except OSError:
+            pass
+    dest.write_bytes(raw)
+
+    device.live_screen_path = rel
+    device.live_screen_pending = False
+    device.live_screen_last_ticket = t
+    device.live_screen_at = datetime.utcnow()
+    await db.commit()
+    return {"ok": True}

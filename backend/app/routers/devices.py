@@ -4,12 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
 from typing import Optional
+import uuid
+
 from app.database import get_db
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.registration_code import get_effective_registration_auth_code
 from app.sse_broadcast import subscribe, unsubscribe, broadcast_device_list_updated, broadcast_schedule_updated
-import uuid
 from datetime import datetime
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -229,6 +230,57 @@ async def delete_group(
         device.group_id = None
     await db.delete(group)
     await db.flush()
+
+
+class LiveScreenRequestResponse(BaseModel):
+    ticket: str
+
+
+class LiveScreenStatusResponse(BaseModel):
+    pending: bool
+    ticket: Optional[str] = None
+    last_ticket: Optional[str] = None
+    image_url: Optional[str] = None
+    captured_at: Optional[str] = None
+
+
+@router.post("/{id}/live-screen/request", response_model=LiveScreenRequestResponse)
+async def request_device_live_screen(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """CMS: 해당 기기 플레이어에 화면 캡처 요청(티켓 발급)."""
+    result = await db.execute(select(Device).where(Device.id == id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    ticket = str(uuid.uuid4())
+    device.live_screen_ticket = ticket
+    device.live_screen_pending = True
+    await db.commit()
+    return LiveScreenRequestResponse(ticket=ticket)
+
+
+@router.get("/{id}/live-screen/status", response_model=LiveScreenStatusResponse)
+async def device_live_screen_status(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """CMS: 캡처 완료 여부·이미지 URL 조회."""
+    result = await db.execute(select(Device).where(Device.id == id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    image_url = f"/uploads/{device.live_screen_path}" if device.live_screen_path else None
+    return LiveScreenStatusResponse(
+        pending=device.live_screen_pending,
+        ticket=device.live_screen_ticket,
+        last_ticket=device.live_screen_last_ticket,
+        image_url=image_url,
+        captured_at=device.live_screen_at.isoformat() if device.live_screen_at else None,
+    )
 
 
 class UpdateDeviceRequest(BaseModel):

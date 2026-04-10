@@ -8,9 +8,12 @@ import {
   sendEvents,
   getScheduleEventsUrl,
   getMediaBaseUrl,
+  pollLiveScreenCapture,
+  uploadLiveScreen,
   DEVICE_NOT_FOUND,
   purgePlayerScheduleCaches,
 } from './lib/api'
+import { capturePlayerZones } from './lib/capture'
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
@@ -45,6 +48,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const eventQueueRef = useRef(getEventQueue())
   const currentContentRef = useRef(null)
+  const zonesRef = useRef(null)
 
   const loadSchedule = useCallback(async (forceRefresh = false) => {
     if (!deviceId) return
@@ -162,6 +166,32 @@ export default function App() {
       window.removeEventListener('offline', onOffline)
     }
   }, [deviceId, loadSchedule])
+
+  // CMS \"실시간 화면\" 요청 시 폴링 후 한 번 캡처·업로드
+  useEffect(() => {
+    if (!deviceId) return
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled) return
+      try {
+        const data = await pollLiveScreenCapture(deviceId)
+        if (!data?.capture || !data?.ticket) return
+        const root = zonesRef.current
+        if (!root) return
+        const blob = await capturePlayerZones(root)
+        if (!blob || cancelled) return
+        await uploadLiveScreen(deviceId, data.ticket, blob)
+      } catch {
+        /* 네트워크 오류 무시 */
+      }
+    }
+    const id = setInterval(tick, 8000)
+    tick()
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [deviceId])
 
   const reportEvent = useCallback((contentId, eventType) => {
     const event = { content_id: contentId, event_type: eventType }
@@ -329,6 +359,7 @@ export default function App() {
     <div className="player-full">
       {!online && <div className="offline-banner">오프라인 재생 중</div>}
       <div
+        ref={zonesRef}
         className="player-zones"
         style={{
           display: 'grid',

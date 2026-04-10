@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import String, DateTime, ForeignKey, Integer
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional
@@ -28,5 +28,11 @@ class Device(Base):
     last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     registered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # 등록 완료 시각(있으면 목록 표시)
+    # CMS \"실시간 화면\" 요청 시 플레이어가 한 번 캡처해 업로드
+    live_screen_pending: Mapped[bool] = mapped_column(Boolean, default=False)
+    live_screen_ticket: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    live_screen_last_ticket: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    live_screen_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # upload_dir 기준 상대경로
+    live_screen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     group: Mapped[Optional["DeviceGroup"]] = relationship("DeviceGroup", back_populates="devices")

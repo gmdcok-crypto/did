@@ -514,6 +514,29 @@ a:hover {
   color: var(--text);
 }
 
+.devices-groups-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin: 0 0 0.85rem;
+}
+
+.devices-groups-title-row h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.devices-groups-default-id {
+  font-size: 0.88rem;
+}
+
+.devices-section-groups > .devices-groups-title-row + .group-list {
+  margin-bottom: 0;
+}
+
 .group-list {
   list-style: none;
   padding: 0;
@@ -526,6 +549,29 @@ a:hover {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.group-list-add-row {
+  padding: 0.4rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.group-list-add-form {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.group-list-add-form .input-sm {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  max-width: 24rem;
 }
 
 .group-name {
@@ -780,6 +826,77 @@ a:hover {
   max-height: 140px;
   padding: 0.5rem;
   background: var(--bg-app);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* 디바이스 실시간 화면 모달 */
+.live-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.live-screen-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  max-width: min(96vw, 1100px);
+  max-height: min(92vh, 900px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.live-screen-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.live-screen-modal-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-screen-modal-status,
+.live-screen-modal-error {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+.live-screen-modal-error {
+  color: #fca5a5;
+}
+
+.live-screen-modal-img-wrap {
+  padding: 0 1rem 1rem;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.live-screen-modal-img-wrap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
   border-radius: 8px;
   border: 1px solid var(--border);
 }
