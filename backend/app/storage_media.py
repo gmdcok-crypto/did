@@ -5,7 +5,8 @@ from __future__ import annotations
 import mimetypes
 import os
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from app.config import Settings
@@ -24,6 +25,33 @@ def ext_to_media_kind(ext: str) -> str:
         if e in exts:
             return kind
     return "image"
+
+
+def repoint_legacy_r2_public_url(url: str, new_base: str) -> Optional[str]:
+    """
+    DB에 예전 pub-xxx.r2.dev 가 박혀 있고 R2_PUBLIC_BASE_URL 만 바뀐 경우,
+    같은 객체 경로(/media/...)를 현재 공개 베이스로 맞춘 전체 URL을 반환. 바꿀 필요 없으면 None.
+    """
+    nb = (new_base or "").strip().rstrip("/")
+    if not nb or not (url or "").strip():
+        return None
+    u = url.strip()
+    try:
+        p = urlparse(u)
+    except Exception:
+        return None
+    if p.scheme not in ("http", "https"):
+        return None
+    if not p.netloc.endswith(".r2.dev"):
+        return None
+    if not p.path.startswith("/media/"):
+        return None
+    origin = f"{p.scheme}://{p.netloc}".rstrip("/")
+    if origin == nb:
+        return None
+    tail = p.path + (("?" + p.query) if p.query else "")
+    new_url = nb + tail
+    return new_url if new_url != u else None
 
 
 def r2_enabled(settings: Settings) -> bool:

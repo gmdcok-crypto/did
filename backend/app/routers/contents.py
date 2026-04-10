@@ -6,9 +6,14 @@ from typing import Optional
 import os
 from app.database import get_db
 from app.models import Content, User, CampaignContent, PlaybackEvent
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_admin_user
 from app.config import get_settings
-from app.storage_media import ALLOWED_EXTENSIONS, upload_media_bytes, delete_media_if_managed
+from app.storage_media import (
+    ALLOWED_EXTENSIONS,
+    upload_media_bytes,
+    delete_media_if_managed,
+    repoint_legacy_r2_public_url,
+)
 
 router = APIRouter(prefix="/contents", tags=["contents"])
 
@@ -41,6 +46,49 @@ class ContentItem(BaseModel):
 class UploadResponse(BaseModel):
     url: str
     filename: str
+
+
+class RepointR2UrlItem(BaseModel):
+    id: int
+    old_url: str
+    new_url: str
+
+
+class RepointR2UrlsResponse(BaseModel):
+    updated: int
+    items: list[RepointR2UrlItem]
+
+
+@router.post("/repoint-r2-public-urls", response_model=RepointR2UrlsResponse)
+async def repoint_r2_public_urls(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin_user),
+):
+    """
+    Railway에서 R2_PUBLIC_BASE_URL 만 바꾼 뒤, 예전 pub-xxx.r2.dev 가 DB에 남아 있을 때
+    `media/...` 경로는 유지하고 호스트만 현재 공개 베이스로 맞춥니다. (관리자 전용)
+    """
+    settings = get_settings()
+    new_base = (settings.r2_public_base_url or "").strip().rstrip("/")
+    if not new_base:
+        raise HTTPException(
+            status_code=400,
+            detail="R2_PUBLIC_BASE_URL 이 설정되어 있어야 합니다.",
+        )
+    result = await db.execute(select(Content))
+    rows = result.scalars().all()
+    items: list[RepointR2UrlItem] = []
+    for c in rows:
+        if not c.url:
+            continue
+        new_u = repoint_legacy_r2_public_url(c.url, new_base)
+        if new_u is None:
+            continue
+        old = c.url
+        c.url = new_u
+        items.append(RepointR2UrlItem(id=c.id, old_url=old, new_url=new_u))
+    await db.commit()
+    return RepointR2UrlsResponse(updated=len(items), items=items)
 
 
 @router.post("/upload", response_model=UploadResponse)

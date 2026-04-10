@@ -1,5 +1,8 @@
 # Railway 배포 (MariaDB + 단일 API 서비스)
 
+> **작업 맥락 (필수)**  
+> 이 프로젝트의 **운영·배포·디버깅 기준 환경은 Railway 프로덕션**(단일 API 서비스, `Dockerfile` 빌드)이다. 문서·이슈·에이전트/대화에서 **기본 전제는 로컬이 아니다.** URL·재현·검증은 **`https://<서비스>.up.railway.app`**(또는 연결한 커스텀 도메인)과 Railway 변수·배포 로그를 기준으로 한다. 로컬 Vite 포트(예: 5173/5174)는 개발 편의일 뿐, **사용자·운영 질문의 답은 Railway 기준**으로 정리한다.
+
 **Railway**는 저장소 루트 **`Dockerfile`** 로 빌드합니다(`railway.toml` → `builder = "DOCKERFILE"`). 예전 방식은 **`nixpacks.toml`** (Nixpacks)입니다. DB는 **MySQL/MariaDB 플러그인**의 `MYSQL_URL`(또는 `DATABASE_URL`)을 API 서비스 변수에 연결합니다.
 
 | 구성 | 역할 |
@@ -42,6 +45,9 @@
 
 **관리자(CMS) 화면 URL**은 별도 서비스가 아니라 **`https://<도메인>/admin/`** 입니다.  
 같은 도메인에서 `/api` 로 API를 쓰므로 **`VITE_API_URL` 설정은 필요 없습니다.**
+
+**`R2_PUBLIC_BASE_URL` 을 바꾼 뒤** 예전 `pub-….r2.dev` 가 DB에 남아 플레이어가 404를 내면, CMS에 로그인한 상태에서 관리자 토큰으로 다음을 한 번 호출해 URL만 맞출 수 있습니다:  
+`POST https://<도메인>/api/contents/repoint-r2-public-urls` (본문 없음). 응답에 치환된 `id`·`old_url`·`new_url` 이 옵니다.
 
 ---
 
