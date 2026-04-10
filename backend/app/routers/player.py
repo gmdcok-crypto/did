@@ -128,7 +128,19 @@ async def get_schedule(
     )
     campaign = result.scalar_one_or_none()
     if not campaign:
-        return ScheduleResponse(layout_id="full", layout_config=None, zones=[])
+        # zones=[] 를 주면 플레이어가 Zone을 하나도 안 그려 전체 검은 화면만 됨
+        return ScheduleResponse(
+            layout_id="full",
+            layout_config=None,
+            zones=[
+                ZoneItem(
+                    id="zone_1",
+                    ratio=1.0,
+                    content_type="placeholder",
+                    items=[{"type": "placeholder", "url": "", "duration_sec": 10}],
+                )
+            ],
+        )
 
     base_url = str(request.base_url).rstrip("/")
     layout_config = schedule.layout_config or {}

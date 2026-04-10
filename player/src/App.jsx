@@ -363,9 +363,11 @@ export default function App() {
     )
   }
 
-  const zones = schedule?.zones || [
-    { id: 'zone_1', ratio: 1, content_type: 'placeholder', items: [] },
-  ]
+  // [] 은 truthy → 빈 zones 일 때도 반드시 폴백 (검은 화면만 나오는 버그 방지)
+  const zones =
+    schedule?.zones && schedule.zones.length > 0
+      ? schedule.zones
+      : [{ id: 'zone_1', ratio: 1, content_type: 'placeholder', items: [] }]
 
   return (
     <div className="player-full">
