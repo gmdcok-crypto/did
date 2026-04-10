@@ -501,6 +501,13 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
   }, [item.id, reportEvent])
 
   if (item.type === 'video') {
+    if (!url) {
+      return (
+        <div className="zone-placeholder">
+          <span>동영상 URL 없음</span>
+        </div>
+      )
+    }
     return (
       <video
         className="media media-video"
@@ -518,6 +525,13 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
   }
 
   if (item.type === 'image') {
+    if (!url) {
+      return (
+        <div className="zone-placeholder">
+          <span>이미지 URL 없음</span>
+        </div>
+      )
+    }
     return (
       <img
         className="media media-image"
@@ -530,6 +544,13 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
   }
 
   if (item.type === 'html') {
+    if (!url) {
+      return (
+        <div className="zone-placeholder">
+          <span>HTML URL 없음</span>
+        </div>
+      )
+    }
     return (
       <iframe
         className="media media-html"

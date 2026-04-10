@@ -331,6 +331,13 @@ if SERVE_PLAYER:
             raise HTTPException(status_code=404)
         if full_path in ("health", "docs", "openapi.json", "redoc", "setup-database"):
             raise HTTPException(status_code=404)
+        # Vite PWA: dist 루트의 registerSW.js, sw.js, workbox-*.js, manifest.webmanifest 등
+        # (위에서 index.html로 잘못 내려가면 SW/캐시가 깨짐)
+        safe_root = os.path.abspath(PLAYER_DIR)
+        target = os.path.abspath(os.path.join(safe_root, full_path))
+        sep = os.sep
+        if (target == safe_root or target.startswith(safe_root + sep)) and os.path.isfile(target):
+            return FileResponse(target)
         return FileResponse(PLAYER_INDEX)
 else:
     @app.get("/")
