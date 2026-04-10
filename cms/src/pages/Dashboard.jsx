@@ -35,11 +35,6 @@ export default function Dashboard() {
 
   if (loading) return <div className="loading">로딩 중...</div>
 
-  const playerUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.hostname}:5174`
-      : ''
-
   return (
     <div className="page">
       <h1>대시보드</h1>
@@ -80,15 +75,6 @@ export default function Dashboard() {
             디바이스 전체 보기
           </Link>
         </section>
-      )}
-
-      {playerUrl && (
-        <p className="muted">
-          플레이어:{' '}
-          <a href={playerUrl} target="_blank" rel="noopener noreferrer">
-            {playerUrl}
-          </a>
-        </p>
       )}
     </div>
   )
