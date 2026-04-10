@@ -446,13 +446,19 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
   const item = items[index % (items.length || 1)]
   const duration = (item?.duration_sec || 10) * 1000
 
+  const advance = useCallback(() => {
+    setIndex((i) => (i + 1) % items.length)
+  }, [items.length])
+
+  // 이미지·HTML 등: 슬롯 시간(duration_sec)마다 다음 미디어. 영상은 재생 끝(onEnded)에서만 넘김.
   useEffect(() => {
     if (!items?.length) return
+    if (item?.type === 'video') return
     const t = setInterval(() => {
       setIndex((i) => (i + 1) % items.length)
     }, duration)
     return () => clearInterval(t)
-  }, [items?.length, duration])
+  }, [items?.length, duration, item?.type, item?.id])
 
   const clearPrevWhenReady = useCallback(() => {
     if (clearPrevTimerRef.current) {
@@ -510,6 +516,7 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
           currentContentRef={currentContentRef}
           mediaBaseUrl={mediaBaseUrl}
           onReady={clearPrevWhenReady}
+          onVideoEnded={item?.type === 'video' ? advance : undefined}
         />
       </div>
       {nextItem && nextItem.type === 'video' && nextItem.id !== item?.id && (
@@ -534,7 +541,7 @@ function NextVideoPreload({ item, mediaBaseUrl }) {
   )
 }
 
-function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady }) {
+function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady, onVideoEnded }) {
   const hasReported = useRef(false)
   const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
 
@@ -561,12 +568,15 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
         src={url}
         autoPlay
         muted
-        loop
         playsInline
         preload="auto"
         onCanPlay={() => onReady?.()}
         onLoadedData={() => onReady?.()}
-        onError={() => reportEvent(item.id, 'error')}
+        onEnded={() => onVideoEnded?.()}
+        onError={() => {
+          reportEvent(item.id, 'error')
+          onVideoEnded?.()
+        }}
       />
     )
   }
