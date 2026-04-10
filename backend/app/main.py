@@ -249,6 +249,11 @@ SERVE_PLAYER = os.path.isfile(PLAYER_INDEX) and os.path.isdir(PLAYER_ASSETS)
 if SERVE_PLAYER:
     app.mount("/assets", StaticFiles(directory=PLAYER_ASSETS), name="player_assets")
 
+    @app.get("/")
+    def serve_player_index():
+        """디스플레이(PWA) 루트 — 일부 프록시·라우터에서 `/{path}` 만으로 `/`가 안 잡히는 경우 대비."""
+        return FileResponse(PLAYER_INDEX)
+
 # CMS 정적 파일(배포 시 cms_dist 빌드 → /admin)
 CMS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cms_dist"))
 CMS_INDEX = os.path.join(CMS_DIR, "index.html")
