@@ -10,8 +10,7 @@ export default function Devices() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ name: '', location: '', group_id: '' })
   const [newGroupName, setNewGroupName] = useState('')
-  const [editingGroupId, setEditingGroupId] = useState(null)
-  const [editingGroupName, setEditingGroupName] = useState('')
+  const [selectedGroupId, setSelectedGroupId] = useState(null)
   const [regAuthCode, setRegAuthCode] = useState('')
   const [regUsesDatabase, setRegUsesDatabase] = useState(false)
   const [regLoading, setRegLoading] = useState(false)
@@ -97,6 +96,13 @@ export default function Devices() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (selectedGroupId != null && !groups.some((g) => g.id === selectedGroupId)) {
+      setSelectedGroupId(null)
+      setNewGroupName('')
+    }
+  }, [groups, selectedGroupId])
+
   // SSE: 디바이스 등록/수정 시 서버가 보내는 신호 수신 → 목록 갱신
   useEffect(() => {
     const es = new EventSource(`${API_BASE}/devices/events`)
@@ -167,41 +173,43 @@ export default function Devices() {
         body: JSON.stringify({ name }),
       })
       setNewGroupName('')
+      setSelectedGroupId(null)
       load()
     } catch (e) {
       alert(e.message)
     }
   }
 
-  const startEditGroup = (g) => {
-    setEditingGroupId(g.id)
-    setEditingGroupName(g.name)
-  }
-
-  const saveGroup = async () => {
-    if (editingGroupId == null) return
-    const name = editingGroupName.trim()
+  const saveSelectedGroup = async () => {
+    if (selectedGroupId == null) {
+      alert('수정할 그룹을 아래 목록에서 먼저 선택하세요.')
+      return
+    }
+    const name = newGroupName.trim()
     if (!name) return
     try {
-      await api(`/devices/groups/${editingGroupId}`, {
+      await api(`/devices/groups/${selectedGroupId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name }),
       })
-      setEditingGroupId(null)
       load()
     } catch (e) {
       alert(e.message)
     }
   }
 
-  const cancelEditGroup = () => {
-    setEditingGroupId(null)
-  }
-
-  const deleteGroup = async (g) => {
-    if (!window.confirm(`"${g.name}" 그룹을 삭제할까요? 소속 디바이스는 그룹 해제됩니다.`)) return
+  const deleteSelectedGroup = async () => {
+    if (selectedGroupId == null) {
+      alert('삭제할 그룹을 아래 목록에서 먼저 선택하세요.')
+      return
+    }
+    const g = groups.find((x) => x.id === selectedGroupId)
+    const label = g?.name || `#${selectedGroupId}`
+    if (!window.confirm(`"${label}" 그룹을 삭제할까요? 소속 디바이스는 그룹 해제됩니다.`)) return
     try {
-      await api(`/devices/groups/${g.id}`, { method: 'DELETE' })
+      await api(`/devices/groups/${selectedGroupId}`, { method: 'DELETE' })
+      setSelectedGroupId(null)
+      setNewGroupName('')
       load()
     } catch (e) {
       alert(e.message)
@@ -292,61 +300,49 @@ export default function Devices() {
         )}
 
         <section className="card section devices-section-groups">
-          <div className="devices-groups-title-row">
-            <h2>디바이스 그룹</h2>
-            <span className="group-id devices-groups-default-id">기본 ID:{defaultGroupId}</span>
-          </div>
-          <ul className="group-list">
+          <h2>디바이스 그룹</h2>
+          <form className="devices-groups-toolbar" onSubmit={addGroup}>
+            <span className="group-id devices-groups-default-label">기본 ID: {defaultGroupId}</span>
+            <input
+              type="text"
+              className="input-sm devices-groups-toolbar-input"
+              placeholder="그룹 이름"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+            />
+            <button type="submit" className="btn btn-sm">
+              추가
+            </button>
+            <button type="button" className="btn btn-sm" onClick={saveSelectedGroup}>
+              수정
+            </button>
+            <button type="button" className="btn btn-sm btn-danger" onClick={deleteSelectedGroup}>
+              삭제
+            </button>
+          </form>
+          <ul className="group-list group-list-selectable">
             {groups.map((g) => (
-              <li key={g.id}>
-                {editingGroupId === g.id ? (
-                  <>
-                    <input
-                      type="text"
-                      className="input-sm"
-                      value={editingGroupName}
-                      onChange={(e) => setEditingGroupName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && saveGroup()}
-                    />
-                    <button type="button" className="btn btn-sm btn-primary" onClick={saveGroup}>
-                      저장
-                    </button>
-                    <button type="button" className="btn btn-sm" onClick={cancelEditGroup}>
-                      취소
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="group-name">{g.name}</span>
-                    <span className="group-id">ID: {g.id}</span>
-                    <button type="button" className="btn btn-sm" onClick={() => startEditGroup(g)}>
-                      수정
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      onClick={() => deleteGroup(g)}
-                    >
-                      삭제
-                    </button>
-                  </>
-                )}
+              <li
+                key={g.id}
+                role="button"
+                tabIndex={0}
+                className={selectedGroupId === g.id ? 'is-selected' : ''}
+                onClick={() => {
+                  setSelectedGroupId(g.id)
+                  setNewGroupName(g.name)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedGroupId(g.id)
+                    setNewGroupName(g.name)
+                  }
+                }}
+              >
+                <span className="group-name">{g.name}</span>
+                <span className="group-id">ID: {g.id}</span>
               </li>
             ))}
-            <li className="group-list-add-row">
-              <form onSubmit={addGroup} className="form-inline group-list-add-form">
-                <input
-                  type="text"
-                  className="input-sm"
-                  placeholder="그룹 이름"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                />
-                <button type="submit" className="btn btn-sm">
-                  추가
-                </button>
-              </form>
-            </li>
           </ul>
         </section>
       </div>
