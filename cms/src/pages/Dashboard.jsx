@@ -90,7 +90,6 @@ export default function Dashboard() {
           </a>
         </p>
       )}
-      <p className="muted">캠페인·미디어·스케줄·디바이스는 상단 메뉴에서 관리할 수 있습니다.</p>
     </div>
   )
 }

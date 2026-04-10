@@ -250,7 +250,7 @@ export default function Schedules() {
                 <tbody>
                   {list.length === 0 ? (
                     <tr>
-                      <td colSpan={7}>스케줄이 없습니다. &quot;추가&quot; 탭에서 새 스케줄을 만드세요.</td>
+                      <td colSpan={7}>없습니다.</td>
                     </tr>
                   ) : (
                     list.map((s) => (
@@ -366,9 +366,7 @@ export default function Schedules() {
                               <div className="form-row form-section">
                                 <label className="section-label">레이아웃에 쓸 이미지 선택 (전체 화면)</label>
                                 <div className="content-check-list zone-select" style={{ maxHeight: '120px' }}>
-                                  {contents.length === 0 ? (
-                                    <span className="muted small">등록된 미디어가 없습니다.</span>
-                                  ) : (
+                                  {contents.length > 0 &&
                                     contents.map((c) => (
                                       <label key={c.id} className="content-check-item">
                                         <input
@@ -378,8 +376,7 @@ export default function Schedules() {
                                         />
                                         <span>{c.name || c.url || `#${c.id}`}</span>
                                       </label>
-                                    ))
-                                  )}
+                                    ))}
                                 </div>
                               </div>
                               <div className="form-row form-section" style={{ marginBottom: 0 }}>
@@ -397,9 +394,6 @@ export default function Schedules() {
                                     )
                                   })}
                                 </div>
-                                {(editForm.layout_config?.content_ids?.length || 0) === 0 && (
-                                  <p className="muted small">위에서 사용할 이미지를 체크하세요.</p>
-                                )}
                               </div>
                             </td>
                           </tr>
@@ -410,31 +404,25 @@ export default function Schedules() {
                               <div className="form-row form-section">
                                 <label className="section-label">분할 레이아웃 · Zone 1 (왼쪽/위) 이미지 선택</label>
                                 <div className="content-check-list zone-select" style={{ maxHeight: '120px' }}>
-                                  {contents.length === 0 ? (
-                                    <span className="muted small">등록된 미디어가 없습니다.</span>
-                                  ) : (
+                                  {contents.length > 0 &&
                                     contents.map((c) => (
                                       <label key={c.id} className="content-check-item">
                                         <input type="checkbox" checked={((editForm.layout_config?.zones)?.[0]?.content_ids || []).includes(c.id)} onChange={() => toggleZoneContent(false, 0, c.id)} />
                                         <span>{c.name || c.url || `#${c.id}`}</span>
                                       </label>
-                                    ))
-                                  )}
+                                    ))}
                                 </div>
                               </div>
                               <div className="form-row form-section" style={{ marginBottom: 0 }}>
                                 <label className="section-label">분할 레이아웃 · Zone 2 (오른쪽/아래) 이미지 선택</label>
                                 <div className="content-check-list zone-select" style={{ maxHeight: '120px' }}>
-                                  {contents.length === 0 ? (
-                                    <span className="muted small">등록된 미디어가 없습니다.</span>
-                                  ) : (
+                                  {contents.length > 0 &&
                                     contents.map((c) => (
                                       <label key={c.id} className="content-check-item">
                                         <input type="checkbox" checked={((editForm.layout_config?.zones)?.[1]?.content_ids || []).includes(c.id)} onChange={() => toggleZoneContent(false, 1, c.id)} />
                                         <span>{c.name || c.url || `#${c.id}`}</span>
                                       </label>
-                                    ))
-                                  )}
+                                    ))}
                                 </div>
                               </div>
                             </td>
@@ -484,9 +472,6 @@ export default function Schedules() {
                       </option>
                     ))}
                   </select>
-                  {campaigns.length === 0 && (
-                    <span className="muted small">캠페인을 먼저 만드세요.</span>
-                  )}
                 </div>
                 <div className="form-row">
                   <label>디바이스 그룹</label>
@@ -501,9 +486,6 @@ export default function Schedules() {
                       </option>
                     ))}
                   </select>
-                  {groups.length === 0 && (
-                    <span className="muted small">디바이스 페이지에서 그룹을 먼저 만드세요.</span>
-                  )}
                 </div>
                 <div className="form-row">
                   <label>레이아웃</label>
@@ -534,11 +516,8 @@ export default function Schedules() {
                 {addForm.layout_id === 'full' && (
                   <div className="form-row form-section">
                     <label className="section-label">레이아웃에 쓸 이미지 선택 (전체 화면)</label>
-                    <p className="muted small">사용할 미디어를 체크하세요. 캠페인을 선택하면 해당 캠페인 미디어가 자동으로 채워집니다.</p>
                     <div className="content-check-list zone-select">
-                      {contents.length === 0 ? (
-                        <p className="muted small">미디어가 없습니다. 미디어 메뉴에서 먼저 이미지/영상을 추가하세요.</p>
-                      ) : (
+                      {contents.length > 0 &&
                         contents.map((c) => (
                           <label key={c.id} className="content-check-item">
                             <input
@@ -548,8 +527,7 @@ export default function Schedules() {
                             />
                             <span>{c.name || c.url || `#${c.id}`}</span>
                           </label>
-                        ))
-                      )}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -569,9 +547,6 @@ export default function Schedules() {
                         )
                       })}
                     </div>
-                    {(addForm.layout_config?.content_ids?.length || 0) === 0 && (
-                      <p className="muted small">위에서 사용할 이미지를 체크하면 여기 순서대로 재생됩니다.</p>
-                    )}
                   </div>
                 )}
                 {(addForm.layout_id === 'split_h' || addForm.layout_id === 'split_v') && (
@@ -579,9 +554,7 @@ export default function Schedules() {
                     <div className="form-row form-section">
                       <label className="section-label">분할 레이아웃 · Zone 1 (왼쪽/위) 이미지 선택</label>
                       <div className="content-check-list zone-select">
-                        {contents.length === 0 ? (
-                          <p className="muted small">미디어가 없습니다. 미디어 메뉴에서 먼저 이미지/영상을 추가하세요.</p>
-                        ) : (
+                        {contents.length > 0 &&
                           contents.map((c) => (
                             <label key={c.id} className="content-check-item">
                               <input
@@ -591,16 +564,13 @@ export default function Schedules() {
                               />
                               <span>{c.name || c.url || `#${c.id}`}</span>
                             </label>
-                          ))
-                        )}
+                          ))}
                       </div>
                     </div>
                     <div className="form-row form-section">
                       <label className="section-label">분할 레이아웃 · Zone 2 (오른쪽/아래) 이미지 선택</label>
                       <div className="content-check-list zone-select">
-                        {contents.length === 0 ? (
-                          <p className="muted small">미디어가 없습니다.</p>
-                        ) : (
+                        {contents.length > 0 &&
                           contents.map((c) => (
                             <label key={c.id} className="content-check-item">
                               <input
@@ -610,8 +580,7 @@ export default function Schedules() {
                               />
                               <span>{c.name || c.url || `#${c.id}`}</span>
                             </label>
-                          ))
-                        )}
+                          ))}
                       </div>
                     </div>
                   </>

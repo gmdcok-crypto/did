@@ -196,7 +196,7 @@ export default function Campaigns() {
                 <tbody>
                   {list.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>캠페인이 없습니다. &quot;추가&quot; 탭에서 새 캠페인을 만드세요.</td>
+                      <td colSpan={6}>없습니다.</td>
                     </tr>
                   ) : (
                     list.map((c) => (
@@ -270,9 +270,7 @@ export default function Campaigns() {
                                 <div className="form-row" style={{ marginBottom: 0 }}>
                                 <label style={{ minWidth: '8rem' }}>사용할 미디어 (선택)</label>
                                 <div className="content-check-list" style={{ maxHeight: '120px' }}>
-                                  {contents.length === 0 ? (
-                                    <span className="muted small">등록된 미디어가 없습니다.</span>
-                                  ) : (
+                                  {contents.length > 0 &&
                                     contents.map((cont) => (
                                       <label key={cont.id} className="content-check-item">
                                         <input
@@ -283,11 +281,9 @@ export default function Campaigns() {
                                         <span>{cont.name || cont.url || `#${cont.id}`}</span>
                                         <span className="mono small">({cont.type})</span>
                                       </label>
-                                    ))
-                                  )}
+                                    ))}
                                 </div>
                               </div>
-                              <p className="muted small" style={{ marginTop: '0.25rem' }}>재생 순서는 스케줄에서 정합니다.</p>
                             </td>
                           </tr>
                         )}
@@ -340,14 +336,11 @@ export default function Campaigns() {
                     value={addForm.priority}
                     onChange={(e) => setAddForm((f) => ({ ...f, priority: parseInt(e.target.value, 10) || 0 }))}
                   />
-                  <span className="muted small">숫자가 클수록 우선</span>
                 </div>
                 <div className="form-row">
                   <label>미디어 (선택)</label>
                   <div className="content-check-list">
-                    {contents.length === 0 ? (
-                      <p className="muted small">등록된 미디어가 없습니다. 미디어 메뉴에서 먼저 추가하세요.</p>
-                    ) : (
+                    {contents.length > 0 &&
                       contents.map((c) => (
                         <label key={c.id} className="content-check-item">
                           <input
@@ -358,8 +351,7 @@ export default function Campaigns() {
                           <span>{c.name || c.url || `#${c.id}`}</span>
                           <span className="mono small">({c.type})</span>
                         </label>
-                      ))
-                    )}
+                      ))}
                   </div>
                 </div>
                 <div className="form-row">

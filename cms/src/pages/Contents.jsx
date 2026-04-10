@@ -127,7 +127,6 @@ export default function Contents() {
 
       <section className="card section">
         <h2>미디어 추가</h2>
-        <p className="muted small">URL 직접 입력하거나, 아래 폴더 아이콘으로 파일을 선택하면 업로드 후 URL이 자동 입력됩니다.</p>
         <form onSubmit={addContent} className="form-row">
           <select
             value={addForm.type}
@@ -196,7 +195,7 @@ export default function Contents() {
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>미디어가 없습니다. 위에서 추가하세요.</td>
+                  <td colSpan={6}>없습니다.</td>
                 </tr>
               ) : (
                 list.map((c) => (
