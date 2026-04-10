@@ -19,6 +19,16 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        // 같은 origin의 CMS(/admin)·API 등은 플레이어 SPA 폴백에서 제외 (SW가 index.html을 끼워 넣지 않음)
+        navigateFallbackDenylist: [
+          /^\/admin/,
+          /^\/api\//,
+          /^\/docs/,
+          /^\/redoc/,
+          /^\/openapi\.json/,
+          /^\/health/,
+          /^\/setup-database/,
+        ],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           // 스케줄은 캐시하지 않음: NetworkFirst(5초 타임아웃) 시 옛 JSON이 계속 나와 기기 삭제/재등록이 막힘
