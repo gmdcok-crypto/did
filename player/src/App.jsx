@@ -48,6 +48,28 @@ function getDeviceIdFromUrl() {
   return params.get('device_id')
 }
 
+function isDebugUrl() {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('debug') === '1'
+}
+
+function DebugHud({ deviceId, schedule, error, online }) {
+  if (!isDebugUrl()) return null
+  const apiHint = typeof window !== 'undefined' ? `${window.location.origin}/api` : ''
+  const zc = schedule?.zones?.length ?? 0
+  return (
+    <div className="player-debug-hud" aria-hidden>
+      <div className="player-debug-hud-title">debug=1</div>
+      <div>device_id: {deviceId ? `${deviceId.slice(0, 12)}…` : '(없음)'}</div>
+      <div>schedule: {schedule ? `로드됨 · zones ${zc}` : '(없음)'}</div>
+      <div>error: {error || '—'}</div>
+      <div>online: {String(online)}</div>
+      <div className="player-debug-hud-mono">API: {apiHint}</div>
+      <div className="player-debug-hud-hint">미디어 실패는 F12 콘솔·Network 또는 여기서 스케줄/존 확인</div>
+    </div>
+  )
+}
+
 export default function App() {
   const [deviceId, setDeviceIdState] = useState(() => getDeviceId())
   const [schedule, setSchedule] = useState(null)
@@ -97,7 +119,9 @@ export default function App() {
           return parsed
         } catch (_) {}
       }
-      setError(e.message)
+      const msg = e?.message || String(e)
+      console.error('[DID player] 스케줄 요청 실패:', msg)
+      setError(msg)
     }
   }, [deviceId])
 
@@ -257,6 +281,7 @@ export default function App() {
 
   if (error && !schedule) {
     return (
+      <>
       <div className="player-full error-screen">
         <div className="player-settings-wrap">
           <button type="button" className="player-settings-btn" onClick={openSettings} title="디바이스 등록">
@@ -307,11 +332,14 @@ export default function App() {
           다시 시도
         </button>
       </div>
+      <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
+      </>
     )
   }
 
   if (!deviceId) {
     return (
+      <>
       <div className="player-full" style={{ flexDirection: 'column', gap: '1rem' }}>
         <div className="player-settings-wrap">
           <button type="button" className="player-settings-btn" onClick={openSettings} title="디바이스 등록">
@@ -360,6 +388,8 @@ export default function App() {
           우측 상단 ⚙에서 인증코드로 등록하세요. CMS에서 기기를 삭제한 경우에도 이 화면으로 돌아와 다시 등록할 수 있습니다.
         </p>
       </div>
+      <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
+      </>
     )
   }
 
@@ -370,6 +400,7 @@ export default function App() {
       : [{ id: 'zone_1', ratio: 1, content_type: 'placeholder', items: [] }]
 
   return (
+    <>
     <div className="player-full">
       {!online && <div className="offline-banner">오프라인 재생 중</div>}
       <div
@@ -401,6 +432,8 @@ export default function App() {
         ))}
       </div>
     </div>
+    <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
+    </>
   )
 }
 

@@ -112,6 +112,42 @@ body {
   height: 100%;
 }
 
+/* ?debug=1 — 키오스크에서 F12 없이 상태 확인 */
+.player-debug-hud {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 50;
+  max-width: min(96vw, 28rem);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #e4e4e7;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  pointer-events: none;
+}
+
+.player-debug-hud-title {
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 0.25rem;
+}
+
+.player-debug-hud-mono {
+  word-break: break-all;
+  opacity: 0.9;
+}
+
+.player-debug-hud-hint {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-family: system-ui, sans-serif;
+}
+
 /* Player settings */
 .player-settings-wrap {
   position: fixed;
