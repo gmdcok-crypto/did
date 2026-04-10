@@ -78,6 +78,7 @@ npm run dev
 ```
 
 - http://localhost:5173 에서 로그인 후 대시보드·캠페인·미디어·스케줄·디바이스 관리
+- **관리자 URL 정리(로컬·배포·PWA)**: [`docs/admin-url.md`](docs/admin-url.md)
 
 ### 3. 플레이어 (PWA)
 
