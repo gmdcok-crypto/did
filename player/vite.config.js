@@ -54,12 +54,22 @@ export default defineConfig({
         orientation: 'any',
         scope: '/',
         start_url: '/',
+        // 바탕화면/작업표시줄에서 "관리자"로 CMS(/admin) 열기 (동일 도메인 배포 시)
+        shortcuts: [
+          {
+            name: '관리자 (CMS)',
+            short_name: 'CMS',
+            description: '캠페인·미디어·스케줄 관리',
+            url: '/admin',
+          },
+        ],
       },
       workbox: {
         // 오프라인 시 navigateFallback 은 플레이어 index.html 한 장만 쓰도록: `/admin` 등은 폴백 금지(Railway 같은 단일 도메인에서 /admin 이 플레이어로 보이는 현상 방지)
         navigateFallbackAllowlist: [/^\/$/],
         navigateFallbackDenylist: [
-          /^\/admin/,
+          // `/admin` 단독(끝 슬래시 없음)도 제외 — `/^\/admin/` 는 `/admin` 에 매칭되지 않아 플레이어 index 로 잘못 폴백되던 버그 수정
+          /^\/admin($|\/)/,
           /^\/api\//,
           /^\/docs/,
           /^\/redoc/,
