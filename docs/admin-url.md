@@ -31,6 +31,19 @@ Dockerfile/Railway 등 **단일 도메인**에서 API + 플레이어(루트) + C
 - CMS 빌드 시 `VITE_BASE_PATH=/admin/` 로 맞춥니다. (`docs/railway-deploy.md` 참고)
 - 플레이어는 보통 같은 도메인의 **`/`** (루트)입니다.
 
+### Railway (이 프로젝트 호스트 예시)
+
+| 용도 | 주소 |
+|------|------|
+| 호스트 | `did-production-ac7b.up.railway.app` |
+| 플레이어(루트) | `https://did-production-ac7b.up.railway.app/` |
+| 관리자(CMS) | `https://did-production-ac7b.up.railway.app/admin` |
+| 로그인 | `https://did-production-ac7b.up.railway.app/admin/login` |
+| API | `https://did-production-ac7b.up.railway.app/api` |
+| 헬스 | `https://did-production-ac7b.up.railway.app/health` |
+
+- Railway에서 서비스 도메인이 바뀌면 이 표의 호스트만 교체하면 됩니다.
+
 ## PWA·바탕화면 바로가기
 
 - **디스플레이용으로 설치한 PWA**(플레이어)는 `start_url`이 루트(`/`)라서, 아이콘을 누르면 **전광판(플레이어) 화면**이 열립니다. 관리자 화면이 아닙니다.
