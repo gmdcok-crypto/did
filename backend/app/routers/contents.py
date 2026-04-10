@@ -4,11 +4,11 @@ from sqlalchemy import select, delete
 from pydantic import BaseModel
 from typing import Optional
 import os
-import uuid
 from app.database import get_db
 from app.models import Content, User, CampaignContent, PlaybackEvent
 from app.deps import get_current_user
 from app.config import get_settings
+from app.storage_media import ALLOWED_EXTENSIONS, upload_media_bytes, delete_media_if_managed
 
 router = APIRouter(prefix="/contents", tags=["contents"])
 
@@ -43,19 +43,12 @@ class UploadResponse(BaseModel):
     filename: str
 
 
-ALLOWED_EXTENSIONS = {
-    "image": {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"},
-    "video": {".mp4", ".webm", ".ogg", ".mov"},
-    "html": {".html", ".htm"},
-}
-
-
 @router.post("/upload", response_model=UploadResponse)
 async def upload_content_file(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):
-    """파일을 업로드하고 접근 URL을 반환합니다. 반환된 URL을 미디어 등록 시 사용하세요."""
+    """파일을 업로드하고 접근 URL을 반환합니다. R2 설정 시 `media/{image|video|html}/` 키로 저장."""
     settings = get_settings()
     ext = os.path.splitext(file.filename or "")[-1].lower()
     if not ext or ext not in {e for s in ALLOWED_EXTENSIONS.values() for e in s}:
@@ -63,17 +56,13 @@ async def upload_content_file(
             status_code=400,
             detail="허용 확장자: 이미지(jpg,png,gif,webp,svg), 동영상(mp4,webm,ogg,mov), HTML(html,htm)",
         )
-    safe_name = f"{uuid.uuid4().hex}{ext}"
-    path = os.path.join(settings.upload_dir, safe_name)
     try:
         content = await file.read()
-        with open(path, "wb") as f:
-            f.write(content)
+        url, key = upload_media_bytes(settings, content, ext)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
-    # 경로만 저장 → IPv6(localhost→::1) 등 호스트 불일치 방지, 플레이어는 같은 origin + /uploads 로 요청
-    url = f"/uploads/{safe_name}"
-    return UploadResponse(url=url, filename=safe_name)
+    filename = key.split("/")[-1] if "/" in key else key
+    return UploadResponse(url=url, filename=filename)
 
 
 @router.get("", response_model=list[ContentItem])
@@ -147,6 +136,9 @@ async def delete_content(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Content not found")
+    settings = get_settings()
+    if c.url:
+        delete_media_if_managed(settings, c.url)
     # FK 참조 제거: 캠페인 소속·재생 이벤트 먼저 삭제
     await db.execute(delete(PlaybackEvent).where(PlaybackEvent.content_id == id))
     await db.execute(delete(CampaignContent).where(CampaignContent.content_id == id))

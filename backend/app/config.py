@@ -34,10 +34,47 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24
     upload_dir: str = "./uploads"
     media_base_url: str = ""
+    # Cloudflare R2 (S3 호환). 아래가 모두 채워지면 미디어 업로드는 R2 버킷으로만 저장됩니다.
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket: str = "did"
+    # 공개 접근 URL 접두어(슬래시 없음). 예: https://pub-xxxx.r2.dev 또는 커스텀 도메인
+    r2_public_base_url: str = ""
     # 회사에서만 아는 디바이스 등록용 인증코드 (플레이어가 등록 시 필수)
     registration_auth_code: str = "dev1234"
     # DDNS/외부 접속 시 CORS 허용 출처 (쉼표 구분). 예: https://noteserver.iptime.org:5173,https://noteserver.iptime.org:5174
     cors_origins_extra: str = ""
+
+    @field_validator("r2_bucket", mode="before")
+    @classmethod
+    def r2_bucket_from_env_aliases(cls, v):
+        """R2_BUCKET_NAME(Railway)·R2_BUCKET·필드값 순으로 버킷 이름 결정."""
+        import os
+
+        name = (os.environ.get("R2_BUCKET_NAME") or "").strip().strip('"').strip("'")
+        if name:
+            return name
+        alt = (os.environ.get("R2_BUCKET") or "").strip().strip('"').strip("'")
+        if alt:
+            return alt
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        return "did"
+
+    @field_validator(
+        "r2_account_id",
+        "r2_access_key_id",
+        "r2_secret_access_key",
+        "r2_public_base_url",
+        mode="after",
+    )
+    @classmethod
+    def strip_r2_env_whitespace(cls, v: str) -> str:
+        """Railway 붙여넣기 시 시크릿/URL 앞뒤 줄바꿈·공백 제거."""
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
     @field_validator("database_url", mode="before")
     @classmethod
