@@ -100,7 +100,12 @@ export default function Contents() {
   }
 
   const deleteContent = async (c) => {
-    if (!window.confirm(`"${c.name || c.url}" 미디어를 삭제할까요?`)) return
+    if (
+      !window.confirm(
+        `"${c.name || c.url}" 미디어를 삭제할까요?\n\n※ 캠페인 또는 스케줄에서 사용 중이면 삭제할 수 없습니다.`,
+      )
+    )
+      return
     try {
       await api(`/contents/${c.id}`, { method: 'DELETE' })
       load()

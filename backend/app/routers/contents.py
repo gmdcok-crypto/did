@@ -14,6 +14,7 @@ from app.storage_media import (
     delete_media_if_managed,
     repoint_legacy_r2_public_url,
 )
+from app.content_usage import content_is_in_use
 
 router = APIRouter(prefix="/contents", tags=["contents"])
 
@@ -184,6 +185,11 @@ async def delete_content(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Content not found")
+    if await content_is_in_use(db, id):
+        raise HTTPException(
+            status_code=409,
+            detail="이 미디어는 캠페인 또는 스케줄에서 사용 중이라 삭제할 수 없습니다. 먼저 해당 캠페인·스케줄에서 제거한 뒤 다시 시도해 주세요.",
+        )
     settings = get_settings()
     if c.url:
         delete_media_if_managed(settings, c.url)
