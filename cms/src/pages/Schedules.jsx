@@ -362,7 +362,7 @@ export default function Schedules() {
                         </tr>
                         {editingId === s.id && editForm.layout_id === 'full' && (
                           <tr>
-                            <td colSpan={7} style={{ padding: '0.75rem 1rem', verticalAlign: 'top', background: '#f8f9fa' }}>
+                            <td colSpan={7} className="table-inline-edit">
                               <div className="form-row form-section">
                                 <label className="section-label">레이아웃에 쓸 이미지 선택 (전체 화면)</label>
                                 <div className="content-check-list zone-select" style={{ maxHeight: '120px' }}>
@@ -406,7 +406,7 @@ export default function Schedules() {
                         )}
                         {editingId === s.id && (editForm.layout_id === 'split_h' || editForm.layout_id === 'split_v') && (
                           <tr>
-                            <td colSpan={7} style={{ padding: '0.75rem 1rem', verticalAlign: 'top', background: '#f8f9fa' }}>
+                            <td colSpan={7} className="table-inline-edit">
                               <div className="form-row form-section">
                                 <label className="section-label">분할 레이아웃 · Zone 1 (왼쪽/위) 이미지 선택</label>
                                 <div className="content-check-list zone-select" style={{ maxHeight: '120px' }}>

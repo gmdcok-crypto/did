@@ -449,6 +449,20 @@ a:hover {
   color: var(--text-muted);
 }
 
+.table td.table-inline-edit {
+  padding: 0.75rem 1rem;
+  vertical-align: top;
+  background: var(--bg-elevated);
+}
+
+.table td.table-inline-edit select,
+.table td.table-inline-edit input[type='text'],
+.table td.table-inline-edit input[type='number'] {
+  background: var(--bg-input);
+  color: var(--text);
+  border-color: var(--border);
+}
+
 .status {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;

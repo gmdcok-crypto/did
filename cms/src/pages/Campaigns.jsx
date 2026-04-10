@@ -266,7 +266,7 @@ export default function Campaigns() {
                         </tr>
                         {editingId === c.id && (
                           <tr>
-                            <td colSpan={6} style={{ padding: '0.75rem 1rem', verticalAlign: 'top', background: '#f8f9fa' }}>
+                            <td colSpan={6} className="table-inline-edit">
                                 <div className="form-row" style={{ marginBottom: 0 }}>
                                 <label style={{ minWidth: '8rem' }}>사용할 미디어 (선택)</label>
                                 <div className="content-check-list" style={{ maxHeight: '120px' }}>
