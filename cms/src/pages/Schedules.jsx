@@ -255,7 +255,7 @@ export default function Schedules() {
                   ) : (
                     list.map((s) => (
                       <Fragment key={s.id}>
-                        <tr>
+                        <tr className={editingId === s.id ? 'table-row-editing' : undefined}>
                         <td>{s.id}</td>
                         {editingId === s.id ? (
                           <>

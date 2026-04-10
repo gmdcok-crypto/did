@@ -453,14 +453,54 @@ a:hover {
   padding: 0.75rem 1rem;
   vertical-align: top;
   background: var(--bg-elevated);
+  color: var(--text);
+}
+
+/* 목록에서 수정 중인 첫 행(이름·일시 입력) — 기본 흰 입력/셀 방지 */
+.table tbody tr.table-row-editing td {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.table tbody tr.table-row-editing .input-sm,
+.table tbody tr.table-row-editing select.input-sm {
+  background: var(--bg-input);
+  color: var(--text);
+  border-color: var(--border);
+  color-scheme: dark;
+}
+
+.table tbody tr.table-row-editing .input-sm::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+  cursor: pointer;
 }
 
 .table td.table-inline-edit select,
 .table td.table-inline-edit input[type='text'],
-.table td.table-inline-edit input[type='number'] {
+.table td.table-inline-edit input[type='number'],
+.table td.table-inline-edit input[type='datetime-local'] {
   background: var(--bg-input);
   color: var(--text);
   border-color: var(--border);
+  color-scheme: dark;
+}
+
+.table td.table-inline-edit input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+  cursor: pointer;
+}
+
+.table td.table-inline-edit .content-check-list {
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.table td.table-inline-edit .form-row label {
+  color: var(--text-muted);
 }
 
 .status {

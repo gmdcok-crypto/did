@@ -201,7 +201,7 @@ export default function Campaigns() {
                   ) : (
                     list.map((c) => (
                       <Fragment key={c.id}>
-                        <tr>
+                        <tr className={editingId === c.id ? 'table-row-editing' : undefined}>
                         <td>{c.id}</td>
                         {editingId === c.id ? (
                           <>
