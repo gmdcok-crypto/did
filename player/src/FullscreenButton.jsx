@@ -7,7 +7,13 @@ function getFullscreenElement() {
 
 async function requestFullscreenOn(el) {
   const fn = el.requestFullscreen ?? el.webkitRequestFullscreen
-  if (fn) await fn.call(el).catch(() => {})
+  if (!fn) return
+  try {
+    // 일부 Chromium: 주소줄 등 내비 UI 숨김 시도
+    await fn.call(el, { navigationUI: 'hide' })
+  } catch {
+    await fn.call(el).catch(() => {})
+  }
 }
 
 async function exitFullscreenDoc() {

@@ -41,6 +41,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      manifest: {
+        name: '디지털 광고 플레이어',
+        short_name: 'DID Player',
+        description: '디지털 사이니지 플레이어',
+        lang: 'ko',
+        theme_color: '#000000',
+        background_color: '#000000',
+        // standalone 이면 OS/브라우저가 제목줄·닫기 버튼을 남기는 경우가 많음 → 가능한 한 UI 없이
+        display: 'fullscreen',
+        display_override: ['fullscreen', 'standalone', 'minimal-ui', 'browser'],
+        orientation: 'any',
+        scope: '/',
+        start_url: '/',
+      },
       workbox: {
         // 오프라인 시 navigateFallback 은 플레이어 index.html 한 장만 쓰도록: `/admin` 등은 폴백 금지(Railway 같은 단일 도메인에서 /admin 이 플레이어로 보이는 현상 방지)
         navigateFallbackAllowlist: [/^\/$/],
