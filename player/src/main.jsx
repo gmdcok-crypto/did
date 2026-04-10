@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import FullscreenButton from './FullscreenButton'
 import { ErrorBoundary } from './ErrorBoundary'
 import './style.css'
 
@@ -10,6 +11,7 @@ if (root) {
     <React.StrictMode>
       <ErrorBoundary>
         <App />
+        <FullscreenButton />
       </ErrorBoundary>
     </React.StrictMode>,
   )
