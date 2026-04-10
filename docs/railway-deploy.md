@@ -71,6 +71,7 @@
 
 ## 문제 해결
 
+- **`/admin` 을 열었는데 플레이어(디스플레이) 화면이 나옴** (같은 Railway 도메인): 플레이어 PWA Service Worker가 예전에 캐시한 `index.html` 을 `/admin` 에도 쓰는 경우가 있습니다. **해결**: 해당 사이트에서 **개발자도구 → Application → Service Workers → Unregister**, **저장소(Storage) 삭제** 후 `https://<도메인>/admin/` 을 다시 열기. 배포 후에도 계속되면 **이 저장소의 최신 이미지**로 재배포(플레이어 빌드에 `navigateFallbackAllowlist` 가 포함됨). Docker 빌드는 `cms_dist/index.html` 이 없으면 실패하도록 막혀 있습니다.
 - **헬스체크 실패**: Deploy 로그에서 `MYSQL_URL`, `/app/backend`, `/app/.venv`, `PORT` 확인.
 - **`/admin` 404**: 빌드 로그에 `cms` 빌드·`cms_dist` 복사가 있는지 확인.
 - **DB 연결 실패**: DB와 API가 같은 프로젝트인지, `MYSQL_URL` 이 **Private** 주소인지 확인 (Public URL로 API가 붙으면 테이블이 다른 곳에 생길 수 있음).

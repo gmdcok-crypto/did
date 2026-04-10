@@ -13,13 +13,37 @@ const useHttp = process.env.VITE_DEV_HTTP === '1' || process.env.USE_HTTP === '1
 const backendHttps = process.env.VITE_BACKEND_HTTPS === '1'
 const backendTarget = backendHttps ? 'https://127.0.0.1:8000' : 'http://127.0.0.1:8000'
 
+/** 로컬에서 플레이어 포트(5174)로 /admin 을 열면 Vite SPA 폴백으로 플레이어 index만 내려가 CMS 대신 플레이어가 보임 → CMS dev로 리다이렉트 */
+function redirectAdminToCmsDev() {
+  const cmsOrigin = (process.env.VITE_CMS_DEV_ORIGIN || 'http://127.0.0.1:5173').replace(/\/$/, '')
+  return {
+    name: 'redirect-admin-to-cms-dev',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const raw = req.url || ''
+        const pathOnly = raw.split('?')[0] || ''
+        if (pathOnly !== '/admin' && !pathOnly.startsWith('/admin/')) {
+          next()
+          return
+        }
+        const tail = pathOnly === '/admin' || pathOnly === '/admin/' ? '/' : pathOnly.slice('/admin'.length) || '/'
+        const qs = raw.includes('?') ? `?${raw.split('?').slice(1).join('?')}` : ''
+        res.writeHead(302, { Location: `${cmsOrigin}${tail}${qs}` })
+        res.end()
+      })
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
+    redirectAdminToCmsDev(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        // 같은 origin의 CMS(/admin)·API 등은 플레이어 SPA 폴백에서 제외 (SW가 index.html을 끼워 넣지 않음)
+        // 오프라인 시 navigateFallback 은 플레이어 index.html 한 장만 쓰도록: `/admin` 등은 폴백 금지(Railway 같은 단일 도메인에서 /admin 이 플레이어로 보이는 현상 방지)
+        navigateFallbackAllowlist: [/^\/$/],
         navigateFallbackDenylist: [
           /^\/admin/,
           /^\/api\//,

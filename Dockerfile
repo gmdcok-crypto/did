@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/ .
 COPY --from=frontend /src/player/dist ./player_dist/
 COPY --from=frontend /src/cms/dist ./cms_dist/
+RUN test -f ./cms_dist/index.html && test -d ./cms_dist/assets \
+  && echo "cms_dist OK" || (echo "cms_dist missing — Railway에서 /admin 이 비거나 플레이어로 보일 수 있음" && exit 1)
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000

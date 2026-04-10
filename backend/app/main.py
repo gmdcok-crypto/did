@@ -240,34 +240,26 @@ settings = get_settings()
 os.makedirs(settings.upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
-# 플레이어 정적 파일(같은 origin으로 서빙 시 외부 접속 시 IP 설정 불필요)
 PLAYER_DIR = os.path.join(os.path.dirname(__file__), "..", "player_dist")
 PLAYER_INDEX = os.path.join(PLAYER_DIR, "index.html")
 PLAYER_ASSETS = os.path.join(PLAYER_DIR, "assets")
 SERVE_PLAYER = os.path.isfile(PLAYER_INDEX) and os.path.isdir(PLAYER_ASSETS)
 
-if SERVE_PLAYER:
-    app.mount("/assets", StaticFiles(directory=PLAYER_ASSETS), name="player_assets")
-
-    @app.get("/")
-    def serve_player_index():
-        """디스플레이(PWA) 루트 — 일부 프록시·라우터에서 `/{path}` 만으로 `/`가 안 잡히는 경우 대비."""
-        return FileResponse(PLAYER_INDEX)
-
-# CMS 정적 파일(배포 시 cms_dist 빌드 → /admin)
 CMS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "cms_dist"))
 CMS_INDEX = os.path.join(CMS_DIR, "index.html")
 CMS_ASSETS = os.path.join(CMS_DIR, "assets")
 SERVE_CMS = os.path.isfile(CMS_INDEX) and os.path.isdir(CMS_ASSETS)
 
+# Railway 단일 서비스: 플레이어 PWA(navigateFallback)가 /admin 을 플레이어 index 로 덮어쓰는 것 방지 — CMS 라우트·마운트를 플레이어보다 먼저 등록
+_CMS_HTML_HEADERS = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+
 if SERVE_CMS:
-    # /admin/assets 는 파일 그대로. /admin/dashboard 등 SPA 경로는 새로고침 시 index.html (StaticFiles html=True 만으로는 404 나는 환경 대비)
     app.mount("/admin/assets", StaticFiles(directory=CMS_ASSETS), name="cms_assets")
 
     @app.get("/admin")
     @app.get("/admin/")
     def cms_admin_index():
-        return FileResponse(CMS_INDEX)
+        return FileResponse(CMS_INDEX, headers=_CMS_HTML_HEADERS)
 
     @app.get("/admin/{full_path:path}")
     def cms_admin_spa(full_path: str):
@@ -279,7 +271,16 @@ if SERVE_CMS:
             raise HTTPException(status_code=404)
         if os.path.isfile(target):
             return FileResponse(target)
-        return FileResponse(CMS_INDEX)
+        return FileResponse(CMS_INDEX, headers=_CMS_HTML_HEADERS)
+
+# 플레이어 정적 파일(같은 origin으로 서빙 시 외부 접속 시 IP 설정 불필요)
+if SERVE_PLAYER:
+    app.mount("/assets", StaticFiles(directory=PLAYER_ASSETS), name="player_assets")
+
+    @app.get("/")
+    def serve_player_index():
+        """디스플레이(PWA) 루트 — 일부 프록시·라우터에서 `/{path}` 만으로 `/`가 안 잡히는 경우 대비."""
+        return FileResponse(PLAYER_INDEX)
 
 
 @app.get("/api/db-status", include_in_schema=False)
