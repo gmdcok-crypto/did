@@ -304,7 +304,7 @@ export default function Campaigns() {
           <div className="tab-panel" role="tabpanel">
             <section className="card section">
               <h2>캠페인 추가</h2>
-              <form onSubmit={handleAddCampaign}>
+              <form className="campaign-form-add" onSubmit={handleAddCampaign}>
                 <div className="form-row">
                   <label>이름</label>
                   <input
