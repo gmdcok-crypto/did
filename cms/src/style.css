@@ -605,20 +605,23 @@ a:hover {
   width: 200px;
 }
 
-/* 캠페인 추가 탭: datetime-local 달력 아이콘을 밝게(다크 UI 가독) */
-.campaign-form-add input[type='datetime-local'] {
+/* 캠페인 추가 탭: datetime-local 달력 아이콘 흰색(다크 UI) */
+.campaign-form-add input[type='datetime-local'].campaign-add-datetime,
+input.campaign-add-datetime[type='datetime-local'] {
   color-scheme: dark;
 }
 
-.campaign-form-add input[type='datetime-local']::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  opacity: 0.95;
+.campaign-form-add input.campaign-add-datetime::-webkit-calendar-picker-indicator,
+input.campaign-add-datetime::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  opacity: 1;
   cursor: pointer;
 }
 
-.campaign-form-add input[type='datetime-local']::-moz-calendar-picker-indicator {
-  filter: invert(1);
-  opacity: 0.95;
+.campaign-form-add input.campaign-add-datetime::-moz-calendar-picker-indicator,
+input.campaign-add-datetime::-moz-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  opacity: 1;
   cursor: pointer;
 }
 

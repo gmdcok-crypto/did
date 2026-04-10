@@ -317,6 +317,7 @@ export default function Campaigns() {
                 <div className="form-row">
                   <label>시작일시</label>
                   <input
+                    className="campaign-add-datetime"
                     type="datetime-local"
                     value={addForm.start_at}
                     onChange={(e) => setAddForm((f) => ({ ...f, start_at: e.target.value }))}
@@ -325,6 +326,7 @@ export default function Campaigns() {
                 <div className="form-row">
                   <label>종료일시</label>
                   <input
+                    className="campaign-add-datetime"
                     type="datetime-local"
                     value={addForm.end_at}
                     onChange={(e) => setAddForm((f) => ({ ...f, end_at: e.target.value }))}
