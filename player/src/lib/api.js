@@ -98,7 +98,11 @@ export async function fetchSchedule(deviceId, options = {}) {
     e.code = DEVICE_NOT_FOUND
     throw e
   }
-  if (!res.ok) throw new Error('Schedule fetch failed')
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    const hint = text ? ` — ${text.slice(0, 200)}` : ''
+    throw new Error(`스케줄 요청 실패 HTTP ${res.status}${hint}`)
+  }
   return res.json()
 }
 

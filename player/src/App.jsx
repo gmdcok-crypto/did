@@ -18,6 +18,18 @@ import { capturePlayerZones } from './lib/capture'
 const POLL_INTERVAL_MS = 5 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
 
+/** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
+const _mediaLoadErrLogged = new Set()
+function logMediaLoadFailure(kind, contentId, url) {
+  const key = `${kind}|${contentId}|${url}`
+  if (_mediaLoadErrLogged.has(key)) return
+  _mediaLoadErrLogged.add(key)
+  console.error(
+    '[DID player] 미디어 로드 실패 — 개발자도구(F12) → Network에서 아래 URL 선택하면 상태코드(403·404 등) 확인 가능',
+    { kind, contentId, url },
+  )
+}
+
 function getEventQueue() {
   try {
     const s = localStorage.getItem(EVENT_QUEUE_KEY)
@@ -538,7 +550,10 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
         src={url}
         alt=""
         onLoad={() => onReady?.()}
-        onError={() => reportEvent(item.id, 'error')}
+        onError={() => {
+          logMediaLoadFailure('image', item.id, url)
+          reportEvent(item.id, 'error')
+        }}
       />
     )
   }
