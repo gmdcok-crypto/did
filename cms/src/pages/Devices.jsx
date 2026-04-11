@@ -54,12 +54,15 @@ function buildLiveScreenStallMessage(d) {
     )
   } else if (x.redisPingOk === false) {
     lines.push(`[Redis] 연결/핑 실패: ${x.redisDetail || '—'} (멀티 인스턴스 실시간 화면에 필요)`)
-  } else   if (x.redisPingOk === true) {
+  } else if (x.redisPingOk === true) {
     lines.push('[Redis] 핑 성공')
+  }
+  if (x.redisHealthHttpStatus != null && x.redisHealthHttpStatus >= 400) {
+    lines.push(`[Redis] 헬스 HTTP ${x.redisHealthHttpStatus} — ${x.redisHealthError || '응답 오류'}`)
   }
   if (x.redisPingOk == null && x.redisConfigured == null && !x.redisHealthSkipped) {
     lines.push(
-      '[Redis] 헬스 미확인 — API 호스트에서 /health/live-screen 을 불러오지 못했거나 아직 응답 전입니다.',
+      '[Redis] 헬스 미확인 — /api/health/live-screen 또는 /health/live-screen 을 불러오지 못했거나 아직 응답 전입니다.',
     )
   }
   if (x.wsError) {
@@ -68,6 +71,10 @@ function buildLiveScreenStallMessage(d) {
     lines.push('[WebSocket] 세션 동안 open 이벤트 없음 — 연결이 막혔거나 토큰/티켓 불일치로 바로 닫혔을 수 있습니다.')
   } else if (x.wsOpen && (x.wsMsg || 0) < 1) {
     lines.push('[WebSocket] 연결은 됐으나 서버에서 메시지(매니페스트/JPEG) 없음')
+  } else if (x.wsOpen && (x.wsMsg || 0) >= 1) {
+    lines.push(
+      '[WebSocket] 메시지는 수신했으나 화면으로 인식되지 않음 — JSON이 아니거나 매니페스트 형식이 아닐 수 있음',
+    )
   }
   if (x.wsCloseCode && x.wsCloseCode !== 1000) {
     const hint =
@@ -91,9 +98,30 @@ function buildLiveScreenStallMessage(d) {
     lines.push('[HTTP JPEG] 없음(404) — 매니페스트만 쓰는 경우 정상일 수 있음')
   }
   if (lines.length === 0) {
-    return '화면이 오지 않습니다. 플레이어 전원·네트워크·같은 device_id 인지 확인하세요.'
+    lines.push('[진단] 위 분기에 안 걸림 — 아래 raw 확인')
   }
   lines.push('— 위 항목으로 원인을 좁혀 보세요.')
+  let raw = ''
+  try {
+    raw = JSON.stringify({
+      v: 2,
+      redisConfigured: x.redisConfigured,
+      redisPingOk: x.redisPingOk,
+      redisDetail: x.redisDetail,
+      redisHealthHttpStatus: x.redisHealthHttpStatus,
+      redisHealthError: x.redisHealthError,
+      wsOpen: x.wsOpen,
+      wsMsg: x.wsMsg,
+      wsError: x.wsError,
+      wsCloseCode: x.wsCloseCode,
+      httpManifestStatus: x.httpManifestStatus,
+      httpFrameStatus: x.httpFrameStatus,
+    })
+  } catch (_) {
+    raw = '(raw 직렬화 실패)'
+  }
+  if (raw.length > 420) raw = `${raw.slice(0, 420)}…`
+  lines.push(`[진단 raw] ${raw}`)
   return lines.join('\n')
 }
 
@@ -401,18 +429,44 @@ export default function Devices() {
       httpManifestStatus: null,
       httpFrameStatus: null,
       redisHealthSkipped: false,
+      redisHealthHttpStatus: null,
+      redisHealthError: null,
     }
-    const origin = getUploadsOrigin()
-    if (origin) {
-      fetch(`${origin.replace(/\/$/, '')}/health/live-screen`, { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((j) => {
+    const tryHealth = async (url) => {
+      const r = await fetch(url, { cache: 'no-store' })
+      liveDiagRef.current.redisHealthHttpStatus = r.status
+      if (!r.ok) {
+        liveDiagRef.current.redisHealthError = `HTTP ${r.status}`
+        return null
+      }
+      return r.json()
+    }
+    ;(async () => {
+      try {
+        let j = null
+        try {
+          j = await tryHealth(`${API_BASE}/health/live-screen`)
+        } catch (_) {
+          j = null
+        }
+        if (!j && getUploadsOrigin()) {
+          const o = getUploadsOrigin().replace(/\/$/, '')
+          try {
+            j = await tryHealth(`${o}/health/live-screen`)
+          } catch (_) {
+            j = null
+          }
+        }
+        if (j) {
           liveDiagRef.current.redisConfigured = j?.redis_configured
           liveDiagRef.current.redisPingOk = j?.redis_ping_ok
           liveDiagRef.current.redisDetail = j?.detail ?? null
-        })
-        .catch(() => {})
-    } else {
+        }
+      } catch (e) {
+        liveDiagRef.current.redisHealthError = String(e?.message || e || 'fetch 실패')
+      }
+    })()
+    if (!getUploadsOrigin() && !String(API_BASE || '').trim()) {
       liveDiagRef.current.redisHealthSkipped = true
     }
     const wsUrl = getLiveViewWsUrl(pk, ticket, token)

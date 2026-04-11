@@ -211,6 +211,12 @@ async def health_live_screen():
     return await check_redis_live_screen()
 
 
+@app.get("/api/health/live-screen")
+async def health_live_screen_under_api():
+    """CMS(Vite /api 프록시)에서 동일 진단을 부를 수 있도록."""
+    return await check_redis_live_screen()
+
+
 @app.head("/health")
 def health_head():
     return Response(status_code=200)
