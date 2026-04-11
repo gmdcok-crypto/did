@@ -530,15 +530,19 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
     }
   }, [index, item?.type])
 
-  if (content_type === 'placeholder' || !items?.length) {
+  // 백엔드는 빈 존에도 content_type은 video 등으로 두고 items만 placeholder로 채움
+  if (
+    content_type === 'placeholder' ||
+    !items?.length ||
+    item?.type === 'placeholder' ||
+    !item
+  ) {
     return (
       <div className="zone zone-placeholder">
         <span>대기 중</span>
       </div>
     )
   }
-
-  if (!item) return null
 
   const prevItem = prevIndex != null ? items[prevIndex % items.length] : null
   const nextItem = items[(index + 1) % items.length]
