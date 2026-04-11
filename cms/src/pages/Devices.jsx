@@ -238,16 +238,21 @@ export default function Devices() {
     })
     try {
       const req = await api(`/devices/${d.id}/live-screen/request`, { method: 'POST' })
-      const ticket = req?.ticket
+      const ticket = String(req?.ticket ?? '').trim()
       if (!ticket) throw new Error('요청 티켓을 받지 못했습니다.')
       if (livePollAbortRef.current !== myAbort) return
-      const deadline = Date.now() + 52000
+      const deadline = Date.now() + 90000
+      let first = true
       while (Date.now() < deadline) {
         if (livePollAbortRef.current !== myAbort) return
-        await new Promise((r) => setTimeout(r, 1800))
+        if (!first) {
+          await new Promise((r) => setTimeout(r, 1000))
+        }
+        first = false
         const st = await api(`/devices/${d.id}/live-screen/status`)
         if (livePollAbortRef.current !== myAbort) return
-        if (st?.last_ticket === ticket && st?.image_url) {
+        const last = String(st?.last_ticket ?? '').trim()
+        if (last && last === ticket && st?.image_url) {
           const src = `${getUploadsOrigin()}${st.image_url}?t=${Date.now()}`
           setLiveModal((m) => ({ ...m, loading: false, imageSrc: src }))
           return

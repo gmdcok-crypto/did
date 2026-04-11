@@ -223,7 +223,7 @@ export default function App() {
         /* 네트워크 오류 무시 */
       }
     }
-    const id = setInterval(tick, 3000)
+    const id = setInterval(tick, 2000)
     tick()
     return () => {
       cancelled = true

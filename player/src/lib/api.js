@@ -120,15 +120,23 @@ export async function pollLiveScreenCapture(deviceId) {
 }
 
 export async function uploadLiveScreen(deviceId, ticket, blob) {
-  const fd = new FormData()
-  fd.append('device_id', deviceId)
-  fd.append('ticket', ticket)
-  fd.append('file', blob, 'screen.jpg')
-  const res = await fetch(`${API_BASE}/player/live-screen-upload`, {
-    method: 'POST',
-    body: fd,
-  })
-  return res.ok
+  const url = `${API_BASE}/player/live-screen-upload`
+  let delay = 400
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const fd = new FormData()
+    fd.append('device_id', deviceId)
+    fd.append('ticket', ticket)
+    fd.append('file', blob, 'screen.jpg')
+    const res = await fetch(url, {
+      method: 'POST',
+      body: fd,
+      cache: 'no-store',
+    })
+    if (res.ok) return true
+    if (attempt < 3) await new Promise((r) => setTimeout(r, delay))
+    delay = Math.min(delay * 2, 2000)
+  }
+  return false
 }
 
 export async function sendEvents(deviceId, events) {
