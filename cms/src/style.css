@@ -1055,14 +1055,20 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   flex: 0 0 auto;
 }
 
-/* 세로 모달 안 콘텐츠: 그리드 셀 높이를 쓰고 cover (flex 대체요소 이슈 회피) */
+/*
+ * 세로 모달: 프레임(9:16 박스·마진)은 그대로 — 미디어만 스트림 사각형을 꽉 채움.
+ * .live-screen-zone--portrait / object-fit:contain 규칙보다 특이도 높게 덮어씀.
+ */
 .live-screen-modal--portrait .live-screen-zone--portrait {
   display: block;
-}
-
-.live-screen-modal--portrait .live-screen-zone-media {
   width: 100%;
   height: 100%;
+}
+
+.live-screen-modal--portrait .live-screen-zone .live-screen-zone-media {
+  width: 100%;
+  height: 100%;
+  max-width: none;
   object-fit: cover;
   display: block;
 }
