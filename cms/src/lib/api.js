@@ -22,6 +22,32 @@ export function clearTokenAndNotify() {
   window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT))
 }
 
+/** fetch 실패 시 JSON detail·HTML·빈 응답까지 구분해 메시지 생성 (구체적 원인 표시) */
+function parseApiErrorBody(bodyText, statusText) {
+  const st = (statusText || '').trim()
+  if (!bodyText || !String(bodyText).trim()) return st || ''
+  const raw = String(bodyText)
+  try {
+    const j = JSON.parse(raw)
+    if (j.detail != null) {
+      const d = j.detail
+      if (typeof d === 'string') return d
+      if (Array.isArray(d))
+        return d
+          .map((item) =>
+            typeof item === 'object' && item && 'msg' in item ? item.msg : JSON.stringify(item),
+          )
+          .join('; ')
+      return typeof d === 'object' ? JSON.stringify(d) : String(d)
+    }
+    if (j.message != null) return String(j.message)
+  } catch {
+    const t = raw.trim().replace(/\s+/g, ' ')
+    if (t.length) return t.slice(0, 500)
+  }
+  return st
+}
+
 export async function api(path, options = {}) {
   const token = getToken()
   const hasBody = options.body != null && options.body !== ''
@@ -38,12 +64,14 @@ export async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${urlPath}`, { ...options, headers, cache: 'no-store' })
   if (res.status === 401) {
     clearTokenAndNotify()
-    const err = await res.json().catch(() => ({ detail: 'Not authenticated' }))
-    throw new Error(err.detail || '로그인이 만료되었습니다. 다시 로그인해 주세요.')
+    const bodyText = await res.text()
+    const inner = parseApiErrorBody(bodyText, res.statusText)
+    throw new Error(inner || '로그인이 만료되었습니다. 다시 로그인해 주세요.')
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || 'Request failed')
+    const bodyText = await res.text()
+    const inner = parseApiErrorBody(bodyText, res.statusText).trim() || '요청 실패'
+    throw new Error(`HTTP ${res.status}: ${inner}`)
   }
   if (res.status === 204 || res.headers.get('Content-Length') === '0') return null
   const text = await res.text()
@@ -63,8 +91,9 @@ export async function uploadFile(path, formData) {
   }
   const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: formData, cache: 'no-store' })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || '업로드 실패')
+    const bodyText = await res.text()
+    const inner = parseApiErrorBody(bodyText, res.statusText).trim() || '업로드 실패'
+    throw new Error(`HTTP ${res.status}: ${inner}`)
   }
   return res.json()
 }
