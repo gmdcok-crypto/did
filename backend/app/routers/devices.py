@@ -304,6 +304,7 @@ async def request_device_live_screen(
     device.live_screen_ticket = ticket
     device.live_screen_pending = True
     device.live_screen_jpeg = None
+    device.live_screen_path = None
     await db.commit()
     broadcast_live_screen_request(device.device_id)
     return LiveScreenRequestResponse(ticket=ticket)
