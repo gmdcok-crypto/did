@@ -33,6 +33,41 @@ function waitVideoFrame(videoEl) {
   })
 }
 
+/**
+ * CMS 실시간 화면용: ref 미연결·레이아웃 0 등으로 zonesRef 가 비어 있을 때 DOM에서 후보 탐색.
+ */
+export function resolveLiveCaptureRoot(zonesRef) {
+  if (typeof document === 'undefined') return null
+  const candidates = [
+    zonesRef?.current,
+    document.querySelector('.player-zones'),
+    document.getElementById('root'),
+    document.body,
+  ]
+  for (const el of candidates) {
+    if (el && el.clientWidth >= 2 && el.clientHeight >= 2) return el
+  }
+  return null
+}
+
+/** 캡처 실패 시에도 업로드해 CMS가 무한 대기하지 않도록 */
+export function capturePlaceholderBlob(text = '화면 캡처 불가 · 플레이어 표시 확인') {
+  const canvas = document.createElement('canvas')
+  canvas.width = 640
+  canvas.height = 360
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return Promise.resolve(null)
+  ctx.fillStyle = '#161618'
+  ctx.fillRect(0, 0, 640, 360)
+  ctx.fillStyle = '#a1a1aa'
+  ctx.font = '16px system-ui,sans-serif'
+  const t = text.length > 120 ? `${text.slice(0, 120)}…` : text
+  ctx.fillText(t, 24, 180)
+  return new Promise((resolve) => {
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82)
+  })
+}
+
 export async function capturePlayerZones(rootEl) {
   if (!rootEl || rootEl.clientWidth < 2 || rootEl.clientHeight < 2) {
     return null

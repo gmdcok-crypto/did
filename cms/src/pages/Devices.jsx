@@ -242,7 +242,7 @@ export default function Devices() {
       const ticket = String(req?.ticket ?? '').trim()
       if (!ticket) throw new Error('요청 티켓을 받지 못했습니다.')
       if (livePollAbortRef.current !== myAbort) return
-      const deadline = Date.now() + 90000
+      const deadline = Date.now() + 120000
       let first = true
       while (Date.now() < deadline) {
         if (livePollAbortRef.current !== myAbort) return

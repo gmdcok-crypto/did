@@ -260,6 +260,10 @@ export async function uploadLiveScreen(deviceId, ticket, blob) {
       cache: 'no-store',
     })
     if (res.ok) return true
+    try {
+      const errText = await res.text()
+      console.warn('[DID player] live-screen-upload 실패', res.status, errText?.slice(0, 200))
+    } catch (_) {}
     if (attempt < 3) await new Promise((r) => setTimeout(r, delay))
     delay = Math.min(delay * 2, 2000)
   }

@@ -19,7 +19,7 @@ import {
   clearAllScheduleStorageCaches,
   hardResetPlayerCaches,
 } from './lib/api'
-import { capturePlayerZones } from './lib/capture'
+import { capturePlayerZones, resolveLiveCaptureRoot, capturePlaceholderBlob } from './lib/capture'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
 
 /** 스케줄 폴링 — last_seen 갱신 주기(오프라인 판정과 맞춤, 기본 2분) */
@@ -289,25 +289,33 @@ export default function App() {
         if (!id) return
         const data = await pollLiveScreenCapture(id)
         if (!data?.capture || !data?.ticket) return
-        const root = zonesRef.current
-        if (!root) return
         const ticket = data.ticket
+        const root = resolveLiveCaptureRoot(zonesRef)
+        if (!root) {
+          console.warn('[DID player] 실시간 화면: 캡처할 DOM 영역을 찾지 못함')
+          const fb = await capturePlaceholderBlob('캡처 영역 없음 · 플레이어 페이지를 열었는지 확인')
+          if (fb && !cancelled) await uploadLiveScreen(id, ticket, fb)
+          return
+        }
         // 비디오 프레임·업로드 준비까지 여러 번 시도 (검은 캡처·일시 실패 완화)
-        for (let attempt = 0; attempt < 10; attempt++) {
+        for (let attempt = 0; attempt < 18; attempt++) {
           if (cancelled) return
-          const blob = await capturePlayerZones(root)
+          let blob = await capturePlayerZones(root)
+          if (!blob && attempt >= 5) {
+            blob = await capturePlaceholderBlob('미디어 캡처 실패(CORS·로딩) · 동일 출처 미디어 권장')
+          }
           if (blob && !cancelled) {
             const ok = await uploadLiveScreen(id, ticket, blob)
             if (ok) return
           }
-          await new Promise((r) => setTimeout(r, 350))
+          await new Promise((r) => setTimeout(r, 320))
         }
       } catch {
         /* 네트워크 오류 무시 */
       }
     }
     liveScreenTickRef.current = tick
-    const intervalMs = 1200
+    const intervalMs = 850
     const timer = setInterval(tick, intervalMs)
     tick()
     return () => {
