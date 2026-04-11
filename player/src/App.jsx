@@ -85,6 +85,12 @@ export default function App() {
   const eventQueueRef = useRef(getEventQueue())
   const currentContentRef = useRef(null)
   const zonesRef = useRef(null)
+  const deviceIdRef = useRef(deviceId)
+  const liveScreenTickRef = useRef(async () => {})
+
+  useEffect(() => {
+    deviceIdRef.current = deviceId
+  }, [deviceId])
 
   const loadSchedule = useCallback(async (forceRefresh = false) => {
     if (!deviceId) return
@@ -146,6 +152,37 @@ export default function App() {
 
   // 자동 등록 제거: 인증코드+이름+위치 입력 후 등록 버튼으로만 등록
 
+  // CMS 실시간 화면: SSE(live_screen_request)로 즉시 캡처 + 폴링 백업
+  useEffect(() => {
+    if (!deviceId) return
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled) return
+      try {
+        const id = deviceIdRef.current
+        if (!id) return
+        const data = await pollLiveScreenCapture(id)
+        if (!data?.capture || !data?.ticket) return
+        const root = zonesRef.current
+        if (!root) return
+        const blob = await capturePlayerZones(root)
+        if (!blob || cancelled) return
+        await uploadLiveScreen(id, data.ticket, blob)
+      } catch {
+        /* 네트워크 오류 무시 */
+      }
+    }
+    liveScreenTickRef.current = tick
+    const intervalMs = 5000
+    const timer = setInterval(tick, intervalMs)
+    tick()
+    return () => {
+      cancelled = true
+      liveScreenTickRef.current = async () => {}
+      clearInterval(timer)
+    }
+  }, [deviceId])
+
   useEffect(() => {
     if (!deviceId) return
     loadSchedule().then((data) => {
@@ -160,7 +197,14 @@ export default function App() {
       if (es) es.close()
       es = new EventSource(getScheduleEventsUrl())
       es.onmessage = (e) => {
-        if (e.data === 'schedule_updated') loadSchedule(true)
+        const msg = e.data
+        if (msg === 'schedule_updated') loadSchedule(true)
+        else if (typeof msg === 'string' && msg.startsWith('live_screen_request:')) {
+          const target = msg.slice('live_screen_request:'.length).trim()
+          if (target && target === deviceIdRef.current) {
+            liveScreenTickRef.current?.()
+          }
+        }
       }
       es.onerror = () => {
         es.close()
@@ -204,32 +248,6 @@ export default function App() {
       window.removeEventListener('offline', onOffline)
     }
   }, [deviceId, loadSchedule])
-
-  // CMS \"실시간 화면\" 요청 시 폴링 후 한 번 캡처·업로드
-  useEffect(() => {
-    if (!deviceId) return
-    let cancelled = false
-    const tick = async () => {
-      if (cancelled) return
-      try {
-        const data = await pollLiveScreenCapture(deviceId)
-        if (!data?.capture || !data?.ticket) return
-        const root = zonesRef.current
-        if (!root) return
-        const blob = await capturePlayerZones(root)
-        if (!blob || cancelled) return
-        await uploadLiveScreen(deviceId, data.ticket, blob)
-      } catch {
-        /* 네트워크 오류 무시 */
-      }
-    }
-    const id = setInterval(tick, 2000)
-    tick()
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
-  }, [deviceId])
 
   const reportEvent = useCallback((contentId, eventType) => {
     const event = { content_id: contentId, event_type: eventType }

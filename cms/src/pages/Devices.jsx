@@ -473,7 +473,24 @@ export default function Devices() {
             {liveModal.error && <p className="live-screen-modal-error">{liveModal.error}</p>}
             {liveModal.imageSrc && (
               <div className="live-screen-modal-img-wrap">
-                <img src={liveModal.imageSrc} alt="디바이스 화면 캡처" />
+                <img
+                  src={liveModal.imageSrc}
+                  alt="디바이스 화면 캡처"
+                  decoding="async"
+                  onError={() => {
+                    setLiveModal((m) =>
+                      m.imageSrc
+                        ? {
+                            ...m,
+                            loading: false,
+                            imageSrc: null,
+                            error:
+                              '캡처 이미지를 불러오지 못했습니다. CMS와 API·/uploads 가 같은 도메인인지(VITE_API_URL), 방화벽·프록시를 확인하세요.',
+                          }
+                        : m,
+                    )
+                  }}
+                />
               </div>
             )}
           </div>

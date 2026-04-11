@@ -10,7 +10,13 @@ from app.database import get_db
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.registration_code import get_effective_registration_auth_code
-from app.sse_broadcast import subscribe, unsubscribe, broadcast_device_list_updated, broadcast_schedule_updated
+from app.sse_broadcast import (
+    subscribe,
+    unsubscribe,
+    broadcast_device_list_updated,
+    broadcast_schedule_updated,
+    broadcast_live_screen_request,
+)
 from datetime import datetime
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -259,6 +265,7 @@ async def request_device_live_screen(
     device.live_screen_ticket = ticket
     device.live_screen_pending = True
     await db.commit()
+    broadcast_live_screen_request(device.device_id)
     return LiveScreenRequestResponse(ticket=ticket)
 
 

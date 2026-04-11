@@ -44,3 +44,15 @@ def broadcast_schedule_updated() -> None:
             q.put_nowait("schedule_updated")
         except asyncio.QueueFull:
             pass
+
+
+def broadcast_live_screen_request(device_id: str) -> None:
+    """CMS가 실시간 화면을 요청했을 때 해당 기기 플레이어(SSE 구독)에 즉시 알림."""
+    if not (device_id or "").strip():
+        return
+    msg = f"live_screen_request:{device_id.strip()}"
+    for q in _schedule_queues:
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass
