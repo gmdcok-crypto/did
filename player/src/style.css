@@ -68,8 +68,12 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
-  animation: mediaFadeIn 0.15s ease-out;
   z-index: 1;
+}
+
+/* 이미지 슬롯 전환 시에만 페이드 인 (key로 리마운트될 때마다 재생) */
+.media-wrap-image-fade {
+  animation: mediaImageFadeIn 0.55s ease-out forwards;
 }
 
 .media-wrap-prev {
@@ -77,9 +81,13 @@ body {
   animation: none;
 }
 
-@keyframes mediaFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes mediaImageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .zone-placeholder {

@@ -17,6 +17,8 @@ import { capturePlayerZones } from './lib/capture'
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
+/** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
+const IMAGE_FADE_MS = 550
 
 /** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
 const _mediaLoadErrLogged = new Set()
@@ -474,10 +476,15 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
       prevIndexRef.current = index
       if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
       const isVideo = item?.type === 'video'
+      const prevClearMs = isVideo
+        ? 8000
+        : item?.type === 'image'
+          ? IMAGE_FADE_MS + 100
+          : 180
       clearPrevTimerRef.current = setTimeout(() => {
         clearPrevTimerRef.current = null
         setPrevIndex(null)
-      }, isVideo ? 8000 : 180)
+      }, prevClearMs)
       return () => {
         if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
       }
@@ -509,7 +516,10 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
           />
         </div>
       )}
-      <div className="media-wrap">
+      <div
+        key={`${index}-${item.id}`}
+        className={item?.type === 'image' ? 'media-wrap media-wrap-image-fade' : 'media-wrap'}
+      >
         <MediaBlock
           item={item}
           reportEvent={reportEvent}
