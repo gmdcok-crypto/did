@@ -210,6 +210,29 @@ export async function fetchSchedule(deviceId, options = {}) {
   return res.json()
 }
 
+/** 등록 직후·불안정 네트워크에서 한 번 실패하면 화면이 비어 보이는 것 완화 */
+export async function fetchScheduleReliable(deviceId, options = {}) {
+  const attempts = options.attempts ?? 5
+  const { attempts: _a, ...rest } = options
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetchSchedule(deviceId, {
+        ...rest,
+        cacheBust: i > 0 || rest.cacheBust,
+        timeoutMs: rest.timeoutMs ?? 22000,
+      })
+    } catch (e) {
+      lastErr = e
+      if (e.code === DEVICE_NOT_FOUND) throw e
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 280 * (i + 1)))
+      }
+    }
+  }
+  throw lastErr
+}
+
 export function getScheduleEventsUrl() {
   return `${API_BASE}/player/events`
 }

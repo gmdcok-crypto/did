@@ -5,6 +5,7 @@ import {
   clearDeviceId,
   registerDevice,
   fetchSchedule,
+  fetchScheduleReliable,
   sendEvents,
   getScheduleEventsUrl,
   getMediaBaseUrl,
@@ -401,12 +402,14 @@ export default function App() {
       setRegisterLocation('')
       setRegisterAuthCode('')
       setShowSettings(false)
-      // 등록 직후 새 id로 스케줄 로드 (loadSchedule()는 아직 옛 deviceId 클로저라 호출하면 안 됨)
+      // 등록 직후 새 id로 스케줄 로드 (한 번 실패 시 조용히 넘어가면 화면이 비어 있고, 다음은 2분 폴링까지 기다림)
       try {
-        const data = await fetchSchedule(id)
+        const data = await fetchScheduleReliable(id, { attempts: 5 })
         setSchedule(data)
         if (data) saveScheduleToStorage(id, data)
-      } catch (_) {}
+      } catch (e) {
+        console.warn('[DID player] 등록 직후 스케줄 로드 재시도 후에도 실패 — 자동 폴링·SSE가 이어짐', e)
+      }
     } catch (e) {
       setRegisterError(e.message || '등록 실패')
     }
@@ -415,6 +418,38 @@ export default function App() {
   const openSettings = () => {
     setRegisterError('')
     setShowSettings(true)
+  }
+
+  // early return 전에 두어야 함 — 그렇지 않으면 deviceId 유무에 따라 훅 개수가 달라져 React #310
+  const zones =
+    schedule?.zones && schedule.zones.length > 0
+      ? schedule.zones
+      : [{ id: 'zone_1', ratio: 1, content_type: 'placeholder', items: [] }]
+
+  const zoneRatio = (z) => {
+    const r = Number(z?.ratio)
+    return Number.isFinite(r) && r > 0 ? r : 1
+  }
+
+  const scheduleLoadError = Boolean(error && !schedule)
+  /** 첫 스케줄 응답 전·요청 중 — 오류는 아님 */
+  const scheduleLoading = Boolean(deviceId && schedule === null && !error)
+
+  /** 스케줄은 왔지만 캠페인/콘텐츠가 비어 placeholder만 → ‘안 나옴’으로 느껴지는 경우 */
+  const scheduleHasPlayableItems = useMemo(() => {
+    if (!schedule?.zones?.length) return false
+    return schedule.zones.some((z) =>
+      (z.items || []).some((it) => it && it.type && it.type !== 'placeholder'),
+    )
+  }, [schedule])
+  const showNoContentHint = Boolean(
+    schedule && !scheduleHasPlayableItems && !scheduleLoading && !scheduleLoadError,
+  )
+
+  const goHardReset = () => {
+    const u = new URL(window.location.href)
+    u.searchParams.set('reset', '1')
+    window.location.href = u.toString()
   }
 
   if (!deviceId) {
@@ -471,38 +506,6 @@ export default function App() {
       <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
       </>
     )
-  }
-
-  // [] 은 truthy → 빈 zones 일 때도 반드시 폴백 (검은 화면만 나오는 버그 방지)
-  const zones =
-    schedule?.zones && schedule.zones.length > 0
-      ? schedule.zones
-      : [{ id: 'zone_1', ratio: 1, content_type: 'placeholder', items: [] }]
-
-  const zoneRatio = (z) => {
-    const r = Number(z?.ratio)
-    return Number.isFinite(r) && r > 0 ? r : 1
-  }
-
-  const scheduleLoadError = Boolean(error && !schedule)
-  /** 첫 스케줄 응답 전·요청 중 — 오류는 아님 */
-  const scheduleLoading = Boolean(deviceId && schedule === null && !error)
-
-  /** 스케줄은 왔지만 캠페인/콘텐츠가 비어 placeholder만 → ‘안 나옴’으로 느껴지는 경우 */
-  const scheduleHasPlayableItems = useMemo(() => {
-    if (!schedule?.zones?.length) return false
-    return schedule.zones.some((z) =>
-      (z.items || []).some((it) => it && it.type && it.type !== 'placeholder'),
-    )
-  }, [schedule])
-  const showNoContentHint = Boolean(
-    schedule && !scheduleHasPlayableItems && !scheduleLoading && !scheduleLoadError,
-  )
-
-  const goHardReset = () => {
-    const u = new URL(window.location.href)
-    u.searchParams.set('reset', '1')
-    window.location.href = u.toString()
   }
 
   return (
