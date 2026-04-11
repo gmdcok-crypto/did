@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { api, getToken, getLiveViewWsUrl, API_BASE } from '../lib/api'
+import { api, getToken, getLiveViewWsUrl, API_BASE, getUploadsOrigin } from '../lib/api'
 import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
@@ -42,6 +42,59 @@ function LiveStreamManifestView({ manifest }) {
       ))}
     </div>
   )
+}
+
+/** 실시간 화면 타임아웃 시 표시할 원인 안내 (수집된 진단 기준) */
+function buildLiveScreenStallMessage(d) {
+  const x = d || {}
+  const lines = []
+  if (x.redisConfigured === false) {
+    lines.push(
+      '[환경] Redis(REDIS_URL) 미설정 — API를 여러 인스턴스로 띄우면 플레이어·CMS가 서로 다른 서버에 붙어 스트림이 안 올 수 있습니다.',
+    )
+  } else if (x.redisPingOk === false) {
+    lines.push(`[Redis] 연결/핑 실패: ${x.redisDetail || '—'} (멀티 인스턴스 실시간 화면에 필요)`)
+  } else   if (x.redisPingOk === true) {
+    lines.push('[Redis] 핑 성공')
+  }
+  if (x.redisPingOk == null && x.redisConfigured == null && !x.redisHealthSkipped) {
+    lines.push(
+      '[Redis] 헬스 미확인 — API 호스트에서 /health/live-screen 을 불러오지 못했거나 아직 응답 전입니다.',
+    )
+  }
+  if (x.wsError) {
+    lines.push('[WebSocket] 연결 오류 이벤트 — wss 차단·프록시·URL을 확인하세요.')
+  } else if (!x.wsOpen) {
+    lines.push('[WebSocket] 세션 동안 open 이벤트 없음 — 연결이 막혔거나 토큰/티켓 불일치로 바로 닫혔을 수 있습니다.')
+  } else if (x.wsOpen && (x.wsMsg || 0) < 1) {
+    lines.push('[WebSocket] 연결은 됐으나 서버에서 메시지(매니페스트/JPEG) 없음')
+  }
+  if (x.wsCloseCode && x.wsCloseCode !== 1000) {
+    const hint =
+      x.wsCloseCode === 4401
+        ? '(인증 실패)'
+        : x.wsCloseCode === 4403
+          ? '(티켓·세션 불일치 — 새로 요청하거나 플레이어가 같은 기기인지 확인)'
+          : ''
+    lines.push(`[WebSocket] 종료 코드 ${x.wsCloseCode} ${hint}`)
+  }
+  const hm = x.httpManifestStatus
+  const hf = x.httpFrameStatus
+  if (hm != null) {
+    if (hm === 404) {
+      lines.push('[HTTP 매니페스트] 아직 없음(404) — 플레이어가 실시간 송신을 시작하지 않았거나 다른 API 인스턴스일 수 있음')
+    } else if (hm === 200) {
+      lines.push('[HTTP 매니페스트] 200 — 데이터는 있는데 WebSocket만 안 오면 프록시가 WS 업그레이드를 막는지 확인')
+    }
+  }
+  if (hf != null && hf === 404) {
+    lines.push('[HTTP JPEG] 없음(404) — 매니페스트만 쓰는 경우 정상일 수 있음')
+  }
+  if (lines.length === 0) {
+    return '화면이 오지 않습니다. 플레이어 전원·네트워크·같은 device_id 인지 확인하세요.'
+  }
+  lines.push('— 위 항목으로 원인을 좁혀 보세요.')
+  return lines.join('\n')
 }
 
 function LiveZoneMedia({ current }) {
@@ -99,6 +152,18 @@ export default function Devices() {
   })
   const livePollAbortRef = useRef(0)
   const liveStallTimerRef = useRef(null)
+  /** 실시간 모달 세션별 진단(타임아웃 메시지용) */
+  const liveDiagRef = useRef({
+    redisConfigured: null,
+    redisPingOk: null,
+    redisDetail: null,
+    wsOpen: false,
+    wsError: false,
+    wsMsg: 0,
+    wsCloseCode: null,
+    httpManifestStatus: null,
+    httpFrameStatus: null,
+  })
 
   const loadRegistrationCode = () => {
     if (user?.role !== 'admin') return
@@ -325,9 +390,37 @@ export default function Devices() {
       setLiveModal((m) => ({ ...m, loading: false, error: '로그인이 필요합니다.' }))
       return
     }
+    liveDiagRef.current = {
+      redisConfigured: null,
+      redisPingOk: null,
+      redisDetail: null,
+      wsOpen: false,
+      wsError: false,
+      wsMsg: 0,
+      wsCloseCode: null,
+      httpManifestStatus: null,
+      httpFrameStatus: null,
+      redisHealthSkipped: false,
+    }
+    const origin = getUploadsOrigin()
+    if (origin) {
+      fetch(`${origin.replace(/\/$/, '')}/health/live-screen`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((j) => {
+          liveDiagRef.current.redisConfigured = j?.redis_configured
+          liveDiagRef.current.redisPingOk = j?.redis_ping_ok
+          liveDiagRef.current.redisDetail = j?.detail ?? null
+        })
+        .catch(() => {})
+    } else {
+      liveDiagRef.current.redisHealthSkipped = true
+    }
     const wsUrl = getLiveViewWsUrl(pk, ticket, token)
     const ws = new WebSocket(wsUrl)
     ws.binaryType = 'arraybuffer'
+    ws.onopen = () => {
+      liveDiagRef.current.wsOpen = true
+    }
     const stallMs = 45000
     const stallTimer = setTimeout(() => {
       setLiveModal((m) => {
@@ -335,14 +428,14 @@ export default function Devices() {
         return {
           ...m,
           loading: false,
-          error:
-            '화면이 오지 않습니다. Railway 등 API가 여러 인스턴스면 백엔드에 Redis(REDIS_URL)를 연결한 뒤 배포하세요. 그 외에는 동일 도메인·wss 차단·플레이어 연결을 확인하세요.',
+          error: buildLiveScreenStallMessage(liveDiagRef.current),
         }
       })
     }, stallMs)
     liveStallTimerRef.current = stallTimer
     // onopen 에서 loading 을 끄면 첫 프레임 전에 본문이 비어 "닫기"만 보임 → 첫 JPEG 수신 시에만 로딩 해제
     ws.onmessage = (ev) => {
+      liveDiagRef.current.wsMsg = (liveDiagRef.current.wsMsg || 0) + 1
       clearTimeout(stallTimer)
       liveStallTimerRef.current = null
       let rawText = null
@@ -369,6 +462,7 @@ export default function Devices() {
       })
     }
     ws.onerror = () => {
+      liveDiagRef.current.wsError = true
       clearTimeout(stallTimer)
       liveStallTimerRef.current = null
       setLiveModal((m) => ({
@@ -376,10 +470,11 @@ export default function Devices() {
         loading: false,
         error:
           m.error ||
-          'WebSocket 연결에 실패했습니다. 같은 도메인의 API인지, wss 차단·프록시를 확인하세요.',
+          `WebSocket 오류. ${buildLiveScreenStallMessage(liveDiagRef.current)}`,
       }))
     }
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      liveDiagRef.current.wsCloseCode = ev?.code ?? null
       clearTimeout(stallTimer)
       liveStallTimerRef.current = null
       setLiveModal((m) => {
@@ -388,7 +483,9 @@ export default function Devices() {
         return {
           ...m,
           loading: false,
-          error: m.error || '스트림이 끊겼거나 첫 화면을 받지 못했습니다.',
+          error:
+            m.error ||
+            `스트림 종료(code ${ev?.code ?? '—'}). ${buildLiveScreenStallMessage(liveDiagRef.current)}`,
         }
       })
     }
@@ -422,6 +519,7 @@ export default function Devices() {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         })
+        liveDiagRef.current.httpManifestStatus = rMan.status
         if (rMan.ok && !cancelled) {
           const j = await rMan.json()
           if (j?.t === 'manifest') {
@@ -437,6 +535,7 @@ export default function Devices() {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         })
+        liveDiagRef.current.httpFrameStatus = res.status
         if (!res.ok || cancelled) return
         const buf = await res.arrayBuffer()
         if (buf.byteLength < 32 || cancelled) return

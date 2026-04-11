@@ -975,6 +975,7 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
 
 .live-screen-modal-error {
   color: #fca5a5;
+  white-space: pre-line;
 }
 
 .live-screen-modal-img-wrap {
