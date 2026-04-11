@@ -377,7 +377,9 @@ async def live_screen_upload(
     db: AsyncSession = Depends(get_db),
 ):
     """플레이어가 캡처한 JPEG 업로드 (device_id·ticket 검증)."""
-    result = await db.execute(select(Device).where(Device.device_id == device_id.strip()))
+    did = (device_id or "").strip()
+    print(f"[live_screen_upload] incoming device_id={did} ticket={(ticket or '')[:8]}…", flush=True)
+    result = await db.execute(select(Device).where(Device.device_id == did))
     device = result.scalar_one_or_none()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")

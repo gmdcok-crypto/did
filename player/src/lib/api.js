@@ -243,10 +243,18 @@ export async function pollLiveScreenCapture(deviceId) {
   url.searchParams.set('_', String(Date.now()))
   const res = await fetch(url.toString(), { cache: 'no-store' })
   if (!res.ok) return { capture: false }
-  return res.json()
+  const data = await res.json()
+  if (data?.capture && data?.ticket) {
+    console.log('[DID player] live-screen-poll 캡처 요청 수신', {
+      device_id: deviceId,
+      ticket: `${String(data.ticket).slice(0, 8)}…`,
+    })
+  }
+  return data
 }
 
 export async function uploadLiveScreen(deviceId, ticket, blob) {
+  console.log('[DID player] live-screen-upload 시도', { device_id: deviceId, ticket: `${String(ticket).slice(0, 8)}…` })
   const url = `${API_BASE}/player/live-screen-upload`
   let delay = 400
   for (let attempt = 0; attempt < 4; attempt++) {

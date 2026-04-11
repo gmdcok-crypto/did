@@ -307,6 +307,10 @@ async def request_device_live_screen(
     device.live_screen_path = None
     await db.commit()
     broadcast_live_screen_request(device.device_id)
+    print(
+        f"[live_screen_request] row id={id} device_id={device.device_id} ticket={ticket[:8]}…",
+        flush=True,
+    )
     return LiveScreenRequestResponse(ticket=ticket)
 
 
