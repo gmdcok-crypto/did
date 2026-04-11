@@ -65,3 +65,15 @@ def broadcast_live_screen_request(device_id: str) -> None:
             q.put_nowait(msg)
         except asyncio.QueueFull:
             pass
+
+
+def broadcast_live_screen_stop(device_id: str) -> None:
+    """CMS가 실시간 화면을 닫았을 때 플레이어가 스트림 전송을 중단하도록 알림."""
+    if not (device_id or "").strip():
+        return
+    msg = f"live_screen_stop:{device_id.strip()}"
+    for q in _schedule_queues:
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass

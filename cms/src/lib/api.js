@@ -10,6 +10,26 @@ export function getUploadsOrigin() {
   return ''
 }
 
+/** CMS 실시간 화면: 서버에서 JPEG 스트림을 받는 WebSocket URL */
+export function getLiveViewWsUrl(devicePk, ticket, token) {
+  let origin
+  const v = import.meta.env.VITE_API_URL
+  if (v && /^https?:\/\//i.test(String(v))) {
+    const u = new URL(String(v).replace(/\/api\/?$/, ''))
+    origin = (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host
+  } else if (typeof window !== 'undefined') {
+    const loc = window.location
+    origin = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host
+  } else {
+    origin = 'ws://localhost:8000'
+  }
+  const url = new URL('/api/devices/ws/live-screen', origin)
+  url.searchParams.set('device_pk', String(devicePk))
+  url.searchParams.set('ticket', ticket)
+  url.searchParams.set('token', token)
+  return url.toString()
+}
+
 const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized'
 
 export function getToken() {

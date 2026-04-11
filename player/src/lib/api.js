@@ -263,6 +263,25 @@ export function getScheduleEventsUrl() {
   return `${API_BASE}/player/events`
 }
 
+/** CMS 실시간 화면 스트리밍: 플레이어 → 서버 WebSocket 송신 URL */
+export function getLiveScreenPushWsUrl(deviceId, ticket) {
+  let origin
+  const v = import.meta.env.VITE_API_URL
+  if (v && /^https?:\/\//i.test(String(v))) {
+    const u = new URL(String(v).replace(/\/api\/?$/, ''))
+    origin = (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host
+  } else if (typeof window !== 'undefined') {
+    const loc = window.location
+    origin = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host
+  } else {
+    origin = 'ws://localhost:8000'
+  }
+  const url = new URL('/api/player/ws/live-screen', origin)
+  url.searchParams.set('device_id', deviceId)
+  url.searchParams.set('ticket', ticket)
+  return url.toString()
+}
+
 export async function pollLiveScreenCapture(deviceId) {
   const url = new URL(`${API_BASE}/player/live-screen-poll`)
   url.searchParams.set('device_id', deviceId)

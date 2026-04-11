@@ -84,9 +84,9 @@ export default defineConfig({
             urlPattern: /\/api\/player\/schedule/,
             handler: 'NetworkOnly',
           },
-          // 실시간 화면 폴링·업로드는 항상 네트워크 (옛 capture:false 캐시로 CMS 미수신 방지)
+          // 실시간 화면 폴링은 항상 네트워크 (옛 캐시로 CMS 미수신 방지)
           {
-            urlPattern: /\/api\/player\/live-screen-(poll|upload)/,
+            urlPattern: /\/api\/player\/live-screen-poll/,
             handler: 'NetworkOnly',
           },
           {
@@ -127,6 +127,7 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
       '/uploads': {
         target: backendTarget,

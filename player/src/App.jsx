@@ -9,8 +9,8 @@ import {
   sendEvents,
   getScheduleEventsUrl,
   getMediaBaseUrl,
+  getLiveScreenPushWsUrl,
   pollLiveScreenCapture,
-  uploadLiveScreen,
   notifyPlayerOffline,
   DEVICE_NOT_FOUND,
   purgePlayerScheduleCaches,
@@ -175,6 +175,7 @@ export default function App() {
   const zonesRef = useRef(null)
   const deviceIdRef = useRef(deviceId)
   const liveScreenTickRef = useRef(async () => {})
+  const liveScreenStreamCloseRef = useRef(() => {})
 
   useEffect(() => {
     deviceIdRef.current = deviceId
@@ -316,52 +317,99 @@ export default function App() {
 
   // 자동 등록 제거: 인증코드+이름+위치 입력 후 등록 버튼으로만 등록
 
-  // CMS 실시간 화면: SSE(live_screen_request)로 즉시 캡처 + 폴링 백업
+  // CMS 실시간 화면: WebSocket으로 JPEG 스트리밍(폴링으로 세션·티켓 감지)
   useEffect(() => {
     if (!deviceId) return
     let cancelled = false
-    const tick = async () => {
-      if (cancelled) return
+    let pollTimer = null
+    let frameTimer = null
+    let ws = null
+
+    const closeStream = () => {
+      if (frameTimer) {
+        clearInterval(frameTimer)
+        frameTimer = null
+      }
+      if (ws) {
+        try {
+          ws.close()
+        } catch (_) {}
+        ws = null
+      }
+    }
+
+    liveScreenStreamCloseRef.current = closeStream
+
+    const sendFrame = async () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return
       try {
-        const id = deviceIdRef.current
-        if (!id) return
-        const data = await pollLiveScreenCapture(id)
-        if (!data?.capture || !data?.ticket) return
-        const ticket = data.ticket
         const root = resolveLiveCaptureRoot(zonesRef)
+        let blob
         if (!root) {
-          console.warn('[DID player] 실시간 화면: 캡처할 DOM 영역을 찾지 못함')
-          const fb = await capturePlaceholderBlob('캡처 영역 없음 · 플레이어 페이지를 열었는지 확인')
-          if (fb && !cancelled) await uploadLiveScreen(id, ticket, fb)
-          return
-        }
-        // 비디오 프레임·업로드 준비까지 여러 번 시도 (검은 캡처·일시 실패 완화)
-        for (let attempt = 0; attempt < 18; attempt++) {
-          if (cancelled) return
-          let blob = await capturePlayerZones(root)
-          if (!blob && attempt >= 5) {
+          blob = await capturePlaceholderBlob('캡처 영역 없음 · 플레이어 페이지를 열었는지 확인')
+        } else {
+          blob = await capturePlayerZones(root)
+          if (!blob) {
             blob = await capturePlaceholderBlob(
-              '미디어 캡처 실패(CORS·로딩). /uploads 동일 출처 권장. 외부 호스트는 R2 CORS + VITE_MEDIA_CROSSORIGIN_HOSTS',
+              '미디어 캡처 실패(CORS·로딩). /uploads 동일 출처 권장.',
             )
           }
-          if (blob && !cancelled) {
-            const ok = await uploadLiveScreen(id, ticket, blob)
-            if (ok) return
+        }
+        if (blob && ws?.readyState === WebSocket.OPEN) {
+          const buf = await blob.arrayBuffer()
+          ws.send(buf)
+        }
+      } catch (_) {}
+    }
+
+    const tick = async () => {
+      if (cancelled) return
+      const id = deviceIdRef.current
+      if (!id) return
+      try {
+        const data = await pollLiveScreenCapture(id)
+        if (cancelled) return
+        if (!data?.capture || !data?.ticket) {
+          closeStream()
+          return
+        }
+        const ticket = String(data.ticket).trim()
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          return
+        }
+        closeStream()
+        const url = getLiveScreenPushWsUrl(id, ticket)
+        ws = new WebSocket(url)
+        ws.binaryType = 'arraybuffer'
+        ws.onopen = () => {
+          if (cancelled) return
+          if (frameTimer) clearInterval(frameTimer)
+          frameTimer = setInterval(sendFrame, 400)
+          sendFrame()
+        }
+        ws.onerror = () => {
+          closeStream()
+        }
+        ws.onclose = () => {
+          if (frameTimer) {
+            clearInterval(frameTimer)
+            frameTimer = null
           }
-          await new Promise((r) => setTimeout(r, 320))
         }
       } catch {
         /* 네트워크 오류 무시 */
       }
     }
+
     liveScreenTickRef.current = tick
-    const intervalMs = 850
-    const timer = setInterval(tick, intervalMs)
+    pollTimer = setInterval(tick, 850)
     tick()
     return () => {
       cancelled = true
       liveScreenTickRef.current = async () => {}
-      clearInterval(timer)
+      liveScreenStreamCloseRef.current = () => {}
+      if (pollTimer) clearInterval(pollTimer)
+      closeStream()
     }
   }, [deviceId])
 
@@ -380,6 +428,11 @@ export default function App() {
           const target = msg.slice('live_screen_request:'.length).trim()
           if (target && target === deviceIdRef.current) {
             liveScreenTickRef.current?.()
+          }
+        } else if (typeof msg === 'string' && msg.startsWith('live_screen_stop:')) {
+          const target = msg.slice('live_screen_stop:'.length).trim()
+          if (target && target === deviceIdRef.current) {
+            liveScreenStreamCloseRef.current?.()
           }
         }
       }

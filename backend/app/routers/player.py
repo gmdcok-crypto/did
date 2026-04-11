@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,8 +7,11 @@ from typing import Optional
 from datetime import datetime
 from urllib.parse import urlparse
 import asyncio
-from app.database import get_db
+from starlette.websockets import WebSocketDisconnect
+
+from app.database import get_db, AsyncSessionLocal
 from app.models import Device, Schedule, Campaign, CampaignContent, Content
+from app.live_screen_stream import hub as live_screen_hub
 from app.sse_broadcast import subscribe_schedule, unsubscribe_schedule, broadcast_device_list_updated
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -361,6 +364,38 @@ async def player_offline(data: PlayerOfflineIn, db: AsyncSession = Depends(get_d
 class LiveScreenPollResponse(BaseModel):
     capture: bool
     ticket: Optional[str] = None
+
+
+@router.websocket("/ws/live-screen")
+async def ws_player_live_screen_push(websocket: WebSocket, device_id: str, ticket: str):
+    """플레이어가 JPEG 프레임을 바이너리로 전송 → CMS 구독자에게 스트리밍."""
+    await websocket.accept()
+    did_key = (device_id or "").strip()
+    t = (ticket or "").strip()
+    if not did_key or not t:
+        await websocket.close(code=4400)
+        return
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Device).where(Device.device_id == did_key))
+        device = result.scalar_one_or_none()
+        if (
+            not device
+            or not device.live_screen_pending
+            or (device.live_screen_ticket or "").strip() != t
+        ):
+            await websocket.close(code=4403)
+            return
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            live_screen_hub.push_frame(did_key, data)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
 
 
 @router.get("/live-screen-poll", response_model=LiveScreenPollResponse)

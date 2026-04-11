@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { api, getUploadsOrigin } from '../lib/api'
+import { api, getToken, getLiveViewWsUrl } from '../lib/api'
 import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
@@ -25,6 +25,9 @@ export default function Devices() {
     imageSrc: null,
     /** 실시간 화면 요청 시 목록의 device_id(UUID) — 플레이어 localStorage 와 비교 안내용 */
     liveDeviceId: '',
+    liveDevicePk: null,
+    ticket: null,
+    prevBlobUrl: null,
   })
   const livePollAbortRef = useRef(0)
 
@@ -221,15 +224,66 @@ export default function Devices() {
 
   const closeLiveModal = () => {
     livePollAbortRef.current += 1
-    setLiveModal({
-      open: false,
-      title: '',
-      loading: false,
-      error: null,
-      imageSrc: null,
-      liveDeviceId: '',
+    const pk = liveModal.liveDevicePk
+    setLiveModal((m) => {
+      if (m.prevBlobUrl) URL.revokeObjectURL(m.prevBlobUrl)
+      return {
+        open: false,
+        title: '',
+        loading: false,
+        error: null,
+        imageSrc: null,
+        liveDeviceId: '',
+        liveDevicePk: null,
+        ticket: null,
+        prevBlobUrl: null,
+      }
     })
+    if (pk != null) {
+      api(`/devices/${pk}/live-screen/stop`, { method: 'POST' }).catch(() => {})
+    }
   }
+
+  /** WebSocket JPEG 스트리밍 — ticket·devicePk 가 준비되면 연결 */
+  useEffect(() => {
+    const open = liveModal.open
+    const ticket = liveModal.ticket
+    const pk = liveModal.liveDevicePk
+    if (!open || !ticket || pk == null) return
+    const token = getToken()
+    if (!token) {
+      setLiveModal((m) => ({ ...m, loading: false, error: '로그인이 필요합니다.' }))
+      return
+    }
+    const wsUrl = getLiveViewWsUrl(pk, ticket, token)
+    const ws = new WebSocket(wsUrl)
+    ws.binaryType = 'arraybuffer'
+    ws.onopen = () => {
+      setLiveModal((m) => ({ ...m, loading: false }))
+    }
+    ws.onmessage = (ev) => {
+      const blob = new Blob([ev.data], { type: 'image/jpeg' })
+      const url = URL.createObjectURL(blob)
+      setLiveModal((m) => {
+        if (m.prevBlobUrl) URL.revokeObjectURL(m.prevBlobUrl)
+        return { ...m, imageSrc: url, prevBlobUrl: url, loading: false, error: null }
+      })
+    }
+    ws.onerror = () => {
+      setLiveModal((m) => ({
+        ...m,
+        loading: false,
+        error: m.error || '실시간 스트림 연결에 실패했습니다. 플레이어가 켜져 있는지 확인하세요.',
+      }))
+    }
+    return () => {
+      ws.close()
+      setLiveModal((m) => {
+        if (m.prevBlobUrl) URL.revokeObjectURL(m.prevBlobUrl)
+        return { ...m, prevBlobUrl: null, imageSrc: null }
+      })
+    }
+  }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk])
 
   const openLiveScreen = async (d) => {
     const myAbort = (livePollAbortRef.current += 1)
@@ -240,60 +294,16 @@ export default function Devices() {
       error: null,
       imageSrc: null,
       liveDeviceId: String(d.device_id ?? '').trim(),
+      liveDevicePk: d.id,
+      ticket: null,
+      prevBlobUrl: null,
     })
     try {
       const req = await api(`/devices/${d.id}/live-screen/request`, { method: 'POST' })
       const ticket = String(req?.ticket ?? '').trim()
       if (!ticket) throw new Error('요청 티켓을 받지 못했습니다.')
       if (livePollAbortRef.current !== myAbort) return
-      const deadline = Date.now() + 120000
-      let first = true
-      /** @type {Record<string, unknown>|null} */
-      let lastSt = null
-      while (Date.now() < deadline) {
-        if (livePollAbortRef.current !== myAbort) return
-        if (!first) {
-          await new Promise((r) => setTimeout(r, 700))
-        }
-        first = false
-        const st = await api(`/devices/${d.id}/live-screen/status`)
-        lastSt = st || null
-        if (livePollAbortRef.current !== myAbort) return
-        const last = String(st?.last_ticket ?? '').trim()
-        if (last && last === ticket) {
-          // DB에 넣은 JPEG(base64) — Railway 다중 인스턴스에서도 동작
-          if (st?.image_base64) {
-            setLiveModal((m) => ({
-              ...m,
-              loading: false,
-              imageSrc: `data:image/jpeg;base64,${st.image_base64}`,
-            }))
-            return
-          }
-          const fallbackPath = `/uploads/screenshots/${d.device_id}.jpg`
-          const path =
-            st?.image_url || (st?.pending === false ? fallbackPath : null)
-          if (path) {
-            const p = String(path).startsWith('/') ? String(path) : `/${path}`
-            const src = `${getUploadsOrigin()}${p}?t=${Date.now()}`
-            setLiveModal((m) => ({ ...m, loading: false, imageSrc: src }))
-            return
-          }
-        }
-      }
-      const cmsDid = String(d.device_id ?? '').trim()
-      const stDid = lastSt != null ? String(lastSt.device_id ?? '').trim() : ''
-      const listServerMatch =
-        cmsDid && stDid ? (cmsDid === stDid ? '예' : '아니오') : '—'
-      const hint =
-        lastSt != null
-          ? ` (요청 device_id=${cmsDid || '—'}, status device_id=${stDid || '—'}, 목록·서버 UUID일치=${listServerMatch}; pending=${String(lastSt.pending)}, base64=${lastSt.image_base64 ? '있음' : '없음'}, url=${lastSt.image_url ? '있음' : '없음'}, 티켓일치=${String(lastSt.last_ticket ?? '').trim() === ticket ? '예' : '아니오'} — 플레이어 F12 → Application → Local Storage → did_device_id 가 요청 device_id 와 같아야 업로드됩니다)`
-          : ` (요청 device_id=${cmsDid || '—'} — 플레이어 localStorage did_device_id 와 동일한지 확인)`
-      setLiveModal((m) => ({
-        ...m,
-        loading: false,
-        error: `시간 내에 화면을 받지 못했습니다. 플레이어 탭을 켠 뒤 다시 시도하세요.${hint}`,
-      }))
+      setLiveModal((m) => ({ ...m, ticket, loading: true }))
     } catch (e) {
       if (livePollAbortRef.current !== myAbort) return
       setLiveModal((m) => ({
@@ -506,13 +516,13 @@ export default function Devices() {
                 닫기
               </button>
             </div>
-            {liveModal.loading && <p className="live-screen-modal-status">기기에서 화면을 가져오는 중…</p>}
+            {liveModal.loading && <p className="live-screen-modal-status">스트림 연결 중… (플레이어가 켜져 있어야 합니다)</p>}
             {liveModal.error && <p className="live-screen-modal-error">{liveModal.error}</p>}
             {liveModal.imageSrc && (
               <div className="live-screen-modal-img-wrap">
                 <img
                   src={liveModal.imageSrc}
-                  alt="디바이스 화면 캡처"
+                  alt="실시간 화면 스트림"
                   decoding="async"
                   onError={() => {
                     setLiveModal((m) =>
@@ -522,7 +532,7 @@ export default function Devices() {
                             loading: false,
                             imageSrc: null,
                             error:
-                              '캡처 이미지를 불러오지 못했습니다. CMS와 API·/uploads 가 같은 도메인인지(VITE_API_URL), 방화벽·프록시를 확인하세요.',
+                              '이미지를 표시하지 못했습니다. WebSocket(wss)이 차단되지 않았는지 확인하세요.',
                           }
                         : m,
                     )

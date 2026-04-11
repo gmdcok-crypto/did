@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -10,9 +12,11 @@ import uuid
 from datetime import datetime, timedelta
 import base64
 
-from app.database import get_db
+from app.auth import decode_access_token
+from app.database import get_db, AsyncSessionLocal
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
+from app.live_screen_stream import hub as live_screen_hub
 from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
 from app.datetime_kst import to_kst_iso
@@ -23,6 +27,7 @@ from app.sse_broadcast import (
     broadcast_device_list_updated,
     broadcast_schedule_updated,
     broadcast_live_screen_request,
+    broadcast_live_screen_stop,
     broadcast_cms_dashboard_updated,
 )
 
@@ -347,6 +352,68 @@ async def device_live_screen_status(
         image_base64=img_b64,
         captured_at=to_kst_iso(device.live_screen_at),
     )
+
+
+@router.post("/{id}/live-screen/stop")
+async def stop_device_live_screen(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """CMS가 실시간 화면을 닫을 때 스트림 종료(플레이어 폴링·SSE로 중단 알림)."""
+    result = await db.execute(select(Device).where(Device.id == id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    device.live_screen_pending = False
+    device.live_screen_ticket = None
+    await db.commit()
+    broadcast_live_screen_stop(device.device_id)
+    return {"ok": True}
+
+
+@router.websocket("/ws/live-screen")
+async def ws_cms_live_screen_view(
+    websocket: WebSocket,
+    device_pk: int,
+    ticket: str,
+    token: str,
+):
+    """CMS 브라우저가 JPEG 프레임을 WebSocket으로 수신(스트리밍)."""
+    await websocket.accept()
+    payload = decode_access_token(token)
+    if not payload or "sub" not in payload:
+        await websocket.close(code=4401)
+        return
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.email == payload["sub"]))
+        u = result.scalar_one_or_none()
+        if not u:
+            await websocket.close(code=4401)
+            return
+        result = await db.execute(select(Device).where(Device.id == device_pk))
+        device = result.scalar_one_or_none()
+        if (
+            not device
+            or not device.live_screen_pending
+            or (device.live_screen_ticket or "").strip() != (ticket or "").strip()
+        ):
+            await websocket.close(code=4403)
+            return
+        did = device.device_id
+    q = live_screen_hub.subscribe(did)
+    try:
+        while True:
+            jpeg = await asyncio.wait_for(q.get(), timeout=120.0)
+            await websocket.send_bytes(jpeg)
+    except asyncio.TimeoutError:
+        pass
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        live_screen_hub.unsubscribe(did, q)
 
 
 class UpdateDeviceRequest(BaseModel):

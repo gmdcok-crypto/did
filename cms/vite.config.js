@@ -22,6 +22,7 @@ const proxyOptions = {
   target: backendTarget,
   changeOrigin: true,
   secure: false,
+  ws: true,
   ...(isBackendHttps && { agent: new https.Agent({ rejectUnauthorized: false }) }),
 }
 
