@@ -72,6 +72,34 @@ body {
   pointer-events: none;
 }
 
+.player-stuck-banner {
+  position: fixed;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  max-width: min(96vw, 22rem);
+  padding: 10px 14px;
+  text-align: center;
+  background: rgba(30, 27, 75, 0.95);
+  border: 1px solid rgba(165, 180, 252, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.player-stuck-banner-text {
+  margin: 0 0 10px 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #e0e7ff;
+}
+
+.player-stuck-banner-btn {
+  font-size: 0.85rem;
+  padding: 0.45rem 0.9rem;
+}
+
 .player-full.error-screen .small {
   font-size: 0.9rem;
   color: #888;

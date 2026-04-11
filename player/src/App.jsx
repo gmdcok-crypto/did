@@ -16,6 +16,7 @@ import {
   saveScheduleToStorage,
   readScheduleFromStorage,
   clearAllScheduleStorageCaches,
+  hardResetPlayerCaches,
 } from './lib/api'
 import { capturePlayerZones } from './lib/capture'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
@@ -96,7 +97,7 @@ function DebugHud({ deviceId, schedule, error, online }) {
       <div>error: {error || '—'}</div>
       <div>online: {String(online)}</div>
       <div className="player-debug-hud-mono">API: {apiHint}</div>
-      <div className="player-debug-hud-hint">미디어 실패는 F12 콘솔·Network 또는 여기서 스케줄/존 확인</div>
+      <div className="player-debug-hud-hint">미디어 실패는 F12 콘솔·Network 또는 여기서 스케줄/존 확인 · 복구: URL에 ?reset=1</div>
     </div>
   )
 }
@@ -111,6 +112,7 @@ export default function App() {
   const [registerLocation, setRegisterLocation] = useState('')
   const [registerError, setRegisterError] = useState('')
   const [showSettings, setShowSettings] = useState(false)
+  const [stuckHint, setStuckHint] = useState(false)
   const eventQueueRef = useRef(getEventQueue())
   const currentContentRef = useRef(null)
   const zonesRef = useRef(null)
@@ -168,6 +170,41 @@ export default function App() {
   useEffect(() => {
     purgePlayerScheduleCaches()
   }, [])
+
+  // ?reset=1 — 스토리지·서비스워커·Cache API 전부 비우고 새로고침 (태블릿 등에서만 안 나올 때)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reset') !== '1') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await hardResetPlayerCaches()
+      } catch (_) {}
+      if (cancelled) return
+      params.delete('reset')
+      const qs = params.toString()
+      const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`
+      window.history.replaceState({}, '', next)
+      window.location.reload()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /** 스케줄이 오래 null이면(네트워크/ SW 꼬임) 수동 복구 안내 */
+  useEffect(() => {
+    const loading = Boolean(deviceId && schedule === null && !error)
+    if (!loading) {
+      setStuckHint(false)
+      return
+    }
+    const t = setTimeout(() => setStuckHint(true), 28000)
+    return () => {
+      clearTimeout(t)
+      setStuckHint(false)
+    }
+  }, [deviceId, schedule, error])
 
   // URL에 device_id가 있으면 적용 (CMS에서 링크로 넣을 때)
   useEffect(() => {
@@ -432,12 +469,26 @@ export default function App() {
   /** 첫 스케줄 응답 전·요청 중 — 오류는 아님 */
   const scheduleLoading = Boolean(deviceId && schedule === null && !error)
 
+  const goHardReset = () => {
+    const u = new URL(window.location.href)
+    u.searchParams.set('reset', '1')
+    window.location.href = u.toString()
+  }
+
   return (
     <>
     <div className="player-full">
       {scheduleLoading && (
         <div className="player-schedule-loading-banner" role="status">
           스케줄 연결 중…
+        </div>
+      )}
+      {scheduleLoading && stuckHint && (
+        <div className="player-stuck-banner" role="alert">
+          <p className="player-stuck-banner-text">화면이 계속 비면 PWA·캐시·서비스워커 문제일 수 있습니다.</p>
+          <button type="button" className="btn btn-primary player-stuck-banner-btn" onClick={goHardReset}>
+            캐시 초기화 후 새로고침
+          </button>
         </div>
       )}
       {scheduleLoadError && (

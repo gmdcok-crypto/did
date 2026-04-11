@@ -113,6 +113,27 @@ export function clearAllScheduleStorageCaches() {
   } catch (_) {}
 }
 
+/**
+ * PWA/서비스워커·Cache Storage까지 비움 — 태블릿에서 캐시만 지워도 옛 JS가 남는 경우 대응.
+ * 주소에 ?reset=1 붙여 한 번 들어오면 자동 실행 후 새로고침( App에서 처리 ).
+ */
+export async function hardResetPlayerCaches() {
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker?.getRegistrations) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+    } catch (_) {}
+  }
+  if (typeof caches !== 'undefined' && caches.keys) {
+    try {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k)))
+    } catch (_) {}
+  }
+  clearAllScheduleStorageCaches()
+  await purgePlayerScheduleCaches()
+}
+
 /** localStorage에 없으면 임시 ID 생성 (등록 전까지 사용) */
 export function getOrCreateDeviceId() {
   let id = localStorage.getItem(DEVICE_ID_KEY)
