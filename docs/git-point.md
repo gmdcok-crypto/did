@@ -8,10 +8,12 @@
 | 항목 | 값 |
 |------|-----|
 | 브랜치 | `main` |
-| 짧은 해시 | `8ca1e6b` |
-| 전체 해시 | `8ca1e6bf97cda0641c44d3cf9398f4c1a3ce614f` |
-| 커밋 시각 | 2026-04-11 23:23:57 +0900 |
-| 제목 | chore(player): remove unused currentContentRef prop chain |
+| 짧은 해시 | `7ff0723` |
+| 전체 해시 | `7ff0723f7607bbb42359aef634e1b27dcaa6f580` |
+| 커밋 시각 | 2026-04-11 23:28:33 +0900 |
+| 제목 | docs: git-point.md 복원 시점용 HEAD·복원 명령 |
+
+**직전 앱 코드만** 기준으로 되돌리려면 (이 문서 파일 추가 이전): `8ca1e6b` — `chore(player): remove unused currentContentRef prop chain`
 
 ## 이 커밋으로 복원하는 방법
 
@@ -20,7 +22,7 @@
 ```bash
 git fetch origin
 git checkout main
-git reset --hard 8ca1e6bf97cda0641c44d3cf9398f4c1a3ce614f
+git reset --hard 7ff0723f7607bbb42359aef634e1b27dcaa6f580
 ```
 
 **원격 `main`도 같은 커밋으로 맞춰야 할 때 (강제 푸시 — 팀과 합의 후):**
@@ -33,7 +35,7 @@ git push origin main --force-with-lease
 
 ```bash
 git fetch origin
-git checkout -b restore/2026-04-11 8ca1e6b
+git checkout -b restore/2026-04-11 7ff0723
 ```
 
 ## 최근 마일스톤 (요약)
