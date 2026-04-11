@@ -25,6 +25,8 @@ class LiveScreenStreamHub:
     def __init__(self) -> None:
         self._subs: Dict[str, List[asyncio.Queue]] = {}
         self._last: Dict[str, bytes] = {}
+        self._manifest_subs: Dict[str, List[asyncio.Queue]] = {}
+        self._last_manifest: Dict[str, str] = {}
 
     def subscriber_count(self, device_id: str) -> int:
         return len(self._subs.get(device_id, []))
@@ -70,6 +72,47 @@ class LiveScreenStreamHub:
             except Exception:
                 pass
 
+    def subscribe_manifest(self, device_id: str) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue(maxsize=8)
+        self._manifest_subs.setdefault(device_id, []).append(q)
+        last = self._last_manifest.get(device_id)
+        if last and len(last) > 2:
+            try:
+                q.put_nowait(last)
+            except asyncio.QueueFull:
+                pass
+        return q
+
+    def unsubscribe_manifest(self, device_id: str, q: asyncio.Queue) -> None:
+        lst = self._manifest_subs.get(device_id)
+        if not lst:
+            return
+        if q in lst:
+            lst.remove(q)
+        if not lst:
+            del self._manifest_subs[device_id]
+
+    def last_manifest(self, device_id: str) -> Optional[str]:
+        s = self._last_manifest.get(device_id)
+        if s and len(s) > 2:
+            return s
+        return None
+
+    def push_manifest(self, device_id: str, text: str) -> None:
+        if len(text) < 2:
+            return
+        self._last_manifest[device_id] = text
+        for q in self._manifest_subs.get(device_id, []):
+            try:
+                while not q.empty():
+                    try:
+                        q.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                q.put_nowait(text)
+            except Exception:
+                pass
+
 
 hub = LiveScreenStreamHub()
 
@@ -84,6 +127,15 @@ def redis_channel(device_id: str) -> str:
 def redis_last_frame_key(device_id: str) -> str:
     """Pub/Sub 구독 전에 발행된 프레임은 유실되므로, 마지막 JPEG를 잠깐 저장해 늦게 붙은 CMS에도 전달."""
     return f"did:live_screen:last:{device_id}"
+
+
+def redis_manifest_json_key(device_id: str) -> str:
+    """캡처 없이 재생 URL·레이아웃만 전달하는 JSON 스냅샷."""
+    return f"did:live_screen:manifest_json:{device_id}"
+
+
+def redis_manifest_pub_channel(device_id: str) -> str:
+    return f"did:live_screen:manifest:{device_id}"
 
 
 def _redis_from_url(url: str):
@@ -131,6 +183,40 @@ async def get_last_jpeg(device_id: str) -> Optional[bytes]:
         except Exception as e:
             logger.warning("get_last_jpeg redis get: %s", e)
     return hub.last_frame(did)
+
+
+async def get_last_manifest_json(device_id: str) -> Optional[str]:
+    did = (device_id or "").strip()
+    if not did:
+        return None
+    r = await get_redis()
+    if r:
+        try:
+            b = await r.get(redis_manifest_json_key(did))
+            if b:
+                if isinstance(b, bytes):
+                    return b.decode("utf-8", errors="replace")
+                return str(b)
+        except Exception as e:
+            logger.warning("get_last_manifest_json redis: %s", e)
+    return hub.last_manifest(did)
+
+
+async def push_manifest(device_id: str, text: str) -> None:
+    """플레이어가 보낸 JSON(재생 URL 스트림). 캡처 JPEG와 별도."""
+    did = (device_id or "").strip()
+    if len(did) < 1 or len(text) < 2:
+        return
+    payload = text.encode("utf-8")
+    r = await get_redis()
+    if r:
+        try:
+            await r.setex(redis_manifest_json_key(did), 90, payload)
+            await r.publish(redis_manifest_pub_channel(did), payload)
+            return
+        except Exception as e:
+            logger.warning("live_screen redis manifest failed, hub: %s", e)
+    hub.push_manifest(did, text)
 
 
 async def check_redis_live_screen() -> dict:

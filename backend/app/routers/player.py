@@ -12,6 +12,7 @@ from starlette.websockets import WebSocketDisconnect
 from app.database import get_db, AsyncSessionLocal
 from app.models import Device, Schedule, Campaign, CampaignContent, Content
 from app.live_screen_stream import push_frame as live_screen_push_frame
+from app.live_screen_stream import push_manifest as live_screen_push_manifest
 from app.sse_broadcast import subscribe_schedule, unsubscribe_schedule, broadcast_device_list_updated
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -368,7 +369,7 @@ class LiveScreenPollResponse(BaseModel):
 
 @router.websocket("/ws/live-screen")
 async def ws_player_live_screen_push(websocket: WebSocket, device_id: str, ticket: str):
-    """플레이어가 JPEG 프레임을 바이너리로 전송 → CMS 구독자에게 스트리밍."""
+    """플레이어 → 서버: 바이너리(JPEG, 선택) + 텍스트(JSON 재생 매니페스트, 캡처 없음)."""
     await websocket.accept()
     did_key = (device_id or "").strip()
     t = (ticket or "").strip()
@@ -387,8 +388,13 @@ async def ws_player_live_screen_push(websocket: WebSocket, device_id: str, ticke
             return
     try:
         while True:
-            data = await websocket.receive_bytes()
-            await live_screen_push_frame(did_key, data)
+            msg = await websocket.receive()
+            if msg.get("type") != "websocket.receive":
+                continue
+            if msg.get("bytes") is not None:
+                await live_screen_push_frame(did_key, msg["bytes"])
+            if msg.get("text") is not None:
+                await live_screen_push_manifest(did_key, msg["text"])
     except WebSocketDisconnect:
         pass
     except Exception:

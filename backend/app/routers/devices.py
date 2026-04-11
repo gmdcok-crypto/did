@@ -17,10 +17,13 @@ from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.live_screen_stream import (
     get_last_jpeg,
+    get_last_manifest_json,
     get_redis,
     hub as live_screen_hub,
     redis_channel,
     redis_last_frame_key,
+    redis_manifest_json_key,
+    redis_manifest_pub_channel,
 )
 from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
@@ -357,6 +360,32 @@ async def get_live_screen_frame(
     )
 
 
+@router.get("/{id}/live-screen/manifest")
+async def get_live_screen_manifest(
+    id: int,
+    ticket: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """HTTP 폴백: 마지막 재생 매니페스트 JSON(캡처 없이 URL 스트림)."""
+    result = await db.execute(select(Device).where(Device.id == id))
+    device = result.scalar_one_or_none()
+    if (
+        not device
+        or not device.live_screen_pending
+        or (device.live_screen_ticket or "").strip() != (ticket or "").strip()
+    ):
+        raise HTTPException(status_code=404, detail="no active live screen session")
+    raw = await get_last_manifest_json(device.device_id)
+    if not raw or len(raw) < 2:
+        raise HTTPException(status_code=404, detail="no manifest yet")
+    return Response(
+        content=raw.encode("utf-8"),
+        media_type="application/json; charset=utf-8",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
 @router.websocket("/ws/live-screen")
 async def ws_cms_live_screen_view(
     websocket: WebSocket,
@@ -364,7 +393,7 @@ async def ws_cms_live_screen_view(
     ticket: str,
     token: str,
 ):
-    """CMS 브라우저가 JPEG 프레임을 WebSocket으로 수신(스트리밍)."""
+    """CMS: 바이너리(JPEG, 선택) + 텍스트(JSON 재생 매니페스트) 스트림."""
     await websocket.accept()
     payload = decode_access_token(token)
     if not payload or "sub" not in payload:
@@ -389,41 +418,73 @@ async def ws_cms_live_screen_view(
     r = await get_redis()
     if r:
         pubsub = r.pubsub()
-        ch = redis_channel(did)
-        await pubsub.subscribe(ch)
+        ch_img = redis_channel(did)
+        ch_man = redis_manifest_pub_channel(did)
+        await pubsub.subscribe(ch_img, ch_man)
         try:
             last = await r.get(redis_last_frame_key(did))
             if last and len(last) >= 32:
                 await websocket.send_bytes(last)
+            last_m = await r.get(redis_manifest_json_key(did))
+            if last_m:
+                txt = (
+                    last_m.decode("utf-8", errors="replace")
+                    if isinstance(last_m, bytes)
+                    else str(last_m)
+                )
+                if len(txt) > 2:
+                    await websocket.send_text(txt)
             async for message in pubsub.listen():
                 if message["type"] != "message" or not message.get("data"):
                     continue
-                await websocket.send_bytes(message["data"])
+                raw_ch = message.get("channel")
+                ch_name = (
+                    raw_ch.decode("utf-8")
+                    if isinstance(raw_ch, bytes)
+                    else (raw_ch or "")
+                )
+                data = message["data"]
+                if ch_name == ch_man:
+                    if isinstance(data, bytes):
+                        await websocket.send_text(data.decode("utf-8", errors="replace"))
+                    else:
+                        await websocket.send_text(str(data))
+                else:
+                    await websocket.send_bytes(data)
         except WebSocketDisconnect:
             pass
         except Exception as e:
             logger.warning("cms live_screen ws (redis): %s", e)
         finally:
             try:
-                await pubsub.unsubscribe(ch)
+                await pubsub.unsubscribe(ch_img, ch_man)
                 await pubsub.close()
             except Exception:
                 pass
         return
 
-    q = live_screen_hub.subscribe(did)
-    try:
+    q_img = live_screen_hub.subscribe(did)
+    q_man = live_screen_hub.subscribe_manifest(did)
+
+    async def pump_img():
         while True:
-            jpeg = await asyncio.wait_for(q.get(), timeout=120.0)
+            jpeg = await q_img.get()
             await websocket.send_bytes(jpeg)
-    except asyncio.TimeoutError:
-        pass
+
+    async def pump_man():
+        while True:
+            text = await q_man.get()
+            await websocket.send_text(text)
+
+    try:
+        await asyncio.gather(pump_img(), pump_man())
     except WebSocketDisconnect:
         pass
     except Exception as e:
         logger.warning("cms live_screen ws (hub): %s", e)
     finally:
-        live_screen_hub.unsubscribe(did, q)
+        live_screen_hub.unsubscribe(did, q_img)
+        live_screen_hub.unsubscribe_manifest(did, q_man)
 
 
 class UpdateDeviceRequest(BaseModel):

@@ -19,7 +19,6 @@ import {
   clearAllScheduleStorageCaches,
   hardResetPlayerCaches,
 } from './lib/api'
-import { liveStreamPlaceholderBlob } from './lib/liveStreamPlaceholder'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
 
 /** 스케줄 폴링 — last_seen 갱신 주기(오프라인 판정과 맞춤, 기본 2분) */
@@ -174,8 +173,24 @@ export default function App() {
   const eventQueueRef = useRef(getEventQueue())
   const zonesRef = useRef(null)
   const deviceIdRef = useRef(deviceId)
+  const scheduleRef = useRef(schedule)
+  const liveZonesRef = useRef({})
   const liveScreenTickRef = useRef(async () => {})
   const liveScreenStreamCloseRef = useRef(() => {})
+
+  useEffect(() => {
+    scheduleRef.current = schedule
+  }, [schedule])
+
+  const onLiveZoneMedia = useCallback((zoneId, payload) => {
+    const id = zoneId != null ? String(zoneId) : ''
+    if (!id) return
+    if (payload == null) {
+      delete liveZonesRef.current[id]
+    } else {
+      liveZonesRef.current[id] = payload
+    }
+  }, [])
 
   useEffect(() => {
     deviceIdRef.current = deviceId
@@ -340,14 +355,26 @@ export default function App() {
 
     liveScreenStreamCloseRef.current = closeStream
 
-    const sendFrame = async () => {
+    const sendManifest = () => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return
+      const sch = scheduleRef.current
+      const zlist = sch?.zones?.length ? sch.zones : []
+      const manifest = {
+        t: 'manifest',
+        v: 1,
+        layout_id: sch?.layout_id || 'full',
+        zones: zlist.map((z) => {
+          const zid = z.id != null ? String(z.id) : ''
+          const cur = liveZonesRef.current[zid]
+          return {
+            id: zid,
+            ratio: typeof z.ratio === 'number' && z.ratio > 0 ? z.ratio : 1,
+            current: cur || null,
+          }
+        }),
+      }
       try {
-        const blob = await liveStreamPlaceholderBlob()
-        if (blob && ws?.readyState === WebSocket.OPEN) {
-          const buf = await blob.arrayBuffer()
-          ws.send(buf)
-        }
+        ws.send(JSON.stringify(manifest))
       } catch (_) {}
     }
 
@@ -373,8 +400,8 @@ export default function App() {
         ws.onopen = () => {
           if (cancelled) return
           if (frameTimer) clearInterval(frameTimer)
-          frameTimer = setInterval(sendFrame, 400)
-          sendFrame()
+          frameTimer = setInterval(sendManifest, 400)
+          sendManifest()
         }
         ws.onerror = () => {
           closeStream()
@@ -728,6 +755,7 @@ export default function App() {
             zone={zone}
             reportEvent={reportEvent}
             mediaBaseUrl={getMediaBaseUrl()}
+            onLiveZoneMedia={onLiveZoneMedia}
           />
         ))}
       </div>
@@ -738,7 +766,7 @@ export default function App() {
   )
 }
 
-function Zone({ zone, reportEvent, mediaBaseUrl }) {
+function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   // zone 이 잠깐 비어 있으면 destructuring 이 훅보다 먼저 throw → 다음 렌더에서 훅 개수 불일치(React #310)
   const content_type = zone?.content_type
   const items = zone?.items ?? []
@@ -771,6 +799,38 @@ function Zone({ zone, reportEvent, mediaBaseUrl }) {
     }
     setPrevIndex(null)
   }, [])
+
+  useEffect(() => {
+    if (!onLiveZoneMedia) return
+    if (
+      content_type === 'placeholder' ||
+      !items?.length ||
+      item?.type === 'placeholder' ||
+      !item
+    ) {
+      onLiveZoneMedia(zone?.id, null)
+      return
+    }
+    const absUrl =
+      item?.url && item.url.startsWith('/uploads')
+        ? (mediaBaseUrl || '') + item.url
+        : item?.url || ''
+    if (!absUrl) {
+      onLiveZoneMedia(zone?.id, null)
+      return
+    }
+    onLiveZoneMedia(zone?.id, { type: item.type, url: absUrl })
+    return () => onLiveZoneMedia(zone?.id, null)
+  }, [
+    onLiveZoneMedia,
+    zone?.id,
+    content_type,
+    items?.length,
+    item?.id,
+    item?.type,
+    item?.url,
+    mediaBaseUrl,
+  ])
 
   useEffect(() => {
     if (prevIndexRef.current !== index) {

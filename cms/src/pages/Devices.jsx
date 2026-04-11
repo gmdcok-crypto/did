@@ -4,6 +4,72 @@ import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from
 import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
 
+/** 플레이어가 보낸 JSON 매니페스트(재생 URL) — 캡처 없음 */
+function LiveStreamManifestView({ manifest }) {
+  const layout = manifest?.layout_id || 'full'
+  const zones = Array.isArray(manifest?.zones) ? manifest.zones : []
+  const splitV = layout === 'split_v'
+  if (zones.length === 0) {
+    return (
+      <div className="live-screen-modal-stream live-screen-modal-stream-empty">
+        <p>재생 중인 존이 없습니다. 스케줄·콘텐츠를 확인하세요.</p>
+      </div>
+    )
+  }
+  return (
+    <div
+      className="live-screen-modal-stream"
+      style={{
+        display: 'grid',
+        gap: 0,
+        minHeight: 'min(70vh, 520px)',
+        background: '#0f0f10',
+        ...(splitV
+          ? {
+              gridTemplateRows: zones.map((z) => `minmax(0,${Number(z.ratio) > 0 ? z.ratio : 1}fr)`).join(' '),
+              gridTemplateColumns: 'minmax(0,1fr)',
+            }
+          : {
+              gridTemplateColumns: zones.map((z) => `minmax(0,${Number(z.ratio) > 0 ? z.ratio : 1}fr)`).join(' '),
+              gridTemplateRows: 'minmax(0,1fr)',
+            }),
+      }}
+    >
+      {zones.map((z) => (
+        <div key={String(z.id)} className="live-screen-zone">
+          <LiveZoneMedia current={z.current} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function LiveZoneMedia({ current }) {
+  if (!current?.url) {
+    return <div className="live-screen-zone-placeholder">대기 중</div>
+  }
+  const { type, url } = current
+  if (type === 'video') {
+    return (
+      <video
+        className="live-screen-zone-media"
+        src={url}
+        autoPlay
+        muted
+        playsInline
+        controls
+      />
+    )
+  }
+  if (type === 'image') {
+    return <img className="live-screen-zone-media" src={url} alt="" decoding="async" />
+  }
+  if (type === 'html') {
+    return <iframe className="live-screen-zone-html" src={url} title="" />
+  }
+  return <div className="live-screen-zone-placeholder">지원하지 않는 타입</div>
+}
+
 export default function Devices() {
   const { user } = useAuth()
   const [list, setList] = useState([])
@@ -28,6 +94,8 @@ export default function Devices() {
     liveDevicePk: null,
     ticket: null,
     prevBlobUrl: null,
+    /** @type {null | { t: string, v?: number, layout_id?: string, zones?: Array<{ id: string, ratio?: number, current: null | { type: string, url: string } }> }} */
+    liveManifest: null,
   })
   const livePollAbortRef = useRef(0)
   const liveStallTimerRef = useRef(null)
@@ -238,6 +306,7 @@ export default function Devices() {
         liveDevicePk: null,
         ticket: null,
         prevBlobUrl: null,
+        liveManifest: null,
       }
     })
     if (pk != null) {
@@ -262,7 +331,7 @@ export default function Devices() {
     const stallMs = 45000
     const stallTimer = setTimeout(() => {
       setLiveModal((m) => {
-        if (!m.open || !m.loading || m.imageSrc) return m
+        if (!m.open || !m.loading || m.imageSrc || m.liveManifest) return m
         return {
           ...m,
           loading: false,
@@ -276,6 +345,16 @@ export default function Devices() {
     ws.onmessage = (ev) => {
       clearTimeout(stallTimer)
       liveStallTimerRef.current = null
+      if (typeof ev.data === 'string') {
+        try {
+          const j = JSON.parse(ev.data)
+          if (j && j.t === 'manifest') {
+            setLiveModal((m) => ({ ...m, liveManifest: j, loading: false, error: null }))
+            return
+          }
+        } catch (_) {}
+        return
+      }
       const blob = new Blob([ev.data], { type: 'image/jpeg' })
       const url = URL.createObjectURL(blob)
       setLiveModal((m) => {
@@ -299,7 +378,7 @@ export default function Devices() {
       liveStallTimerRef.current = null
       setLiveModal((m) => {
         if (!m.open) return m
-        if (m.imageSrc) return m
+        if (m.imageSrc || m.liveManifest) return m
         return {
           ...m,
           loading: false,
@@ -323,7 +402,8 @@ export default function Devices() {
     const ticket = liveModal.ticket
     const pk = liveModal.liveDevicePk
     const imageSrc = liveModal.imageSrc
-    if (!open || !ticket || pk == null || imageSrc) return
+    const liveManifest = liveModal.liveManifest
+    if (!open || !ticket || pk == null || imageSrc || liveManifest) return
     const token = getToken()
     if (!token) return
 
@@ -332,6 +412,21 @@ export default function Devices() {
       if (cancelled) return
       try {
         const qs = new URLSearchParams({ ticket })
+        const rMan = await fetch(`${API_BASE}/devices/${pk}/live-screen/manifest?${qs}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        if (rMan.ok && !cancelled) {
+          const j = await rMan.json()
+          if (j?.t === 'manifest') {
+            if (liveStallTimerRef.current) {
+              clearTimeout(liveStallTimerRef.current)
+              liveStallTimerRef.current = null
+            }
+            setLiveModal((m) => ({ ...m, liveManifest: j, loading: false, error: null }))
+            return
+          }
+        }
         const res = await fetch(`${API_BASE}/devices/${pk}/live-screen/frame?${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
@@ -361,7 +456,7 @@ export default function Devices() {
       cancelled = true
       clearInterval(t)
     }
-  }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk, liveModal.imageSrc])
+  }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk, liveModal.imageSrc, liveModal.liveManifest])
 
   const openLiveScreen = async (d) => {
     const myAbort = (livePollAbortRef.current += 1)
@@ -375,6 +470,7 @@ export default function Devices() {
       liveDevicePk: d.id,
       ticket: null,
       prevBlobUrl: null,
+      liveManifest: null,
     })
     try {
       const req = await api(`/devices/${d.id}/live-screen/request`, { method: 'POST' })
@@ -598,7 +694,10 @@ export default function Devices() {
               <p className="live-screen-modal-status">실시간 화면을 불러오는 중입니다…</p>
             )}
             {liveModal.error && <p className="live-screen-modal-error">{liveModal.error}</p>}
-            {liveModal.imageSrc && (
+            {liveModal.liveManifest && (
+              <LiveStreamManifestView manifest={liveModal.liveManifest} />
+            )}
+            {liveModal.imageSrc && !liveModal.liveManifest && (
               <div className="live-screen-modal-img-wrap">
                 <img
                   src={liveModal.imageSrc}
