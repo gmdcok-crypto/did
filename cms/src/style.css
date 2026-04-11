@@ -944,6 +944,7 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  min-height: 0;
 }
 
 /* full_portrait 스케줄: 가로형 팝업과 비슷한 체감 높이 한도, 폭만 세로에 맞게 좁힘 */
@@ -1027,25 +1028,51 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   margin: 0;
 }
 
-/* 세로형 모달 안: 본문 높이에 맞춰 9:16 영역이 세로로 최대한 채움 */
+/*
+ * 세로 모달(full_portrait): 퍼센트 높이·컨테이너 쿼리 없이 고정 (이전에 높이 0 붕괴 방지)
+ * — 폭 100% + aspect-ratio 로 높이 산출, max-height 로 뷰포트 상한만 제한
+ */
 .live-screen-modal--portrait .live-screen-portrait-outer {
   margin: 0 0.75rem 0.75rem;
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 220px;
   display: flex;
   flex-direction: row;
   justify-content: center;
-  align-items: stretch;
+  align-items: center;
 }
 
 .live-screen-modal--portrait .live-screen-portrait-outer .live-screen-modal-stream {
-  width: auto;
-  height: 100%;
-  max-height: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100%;
   max-width: 100%;
   aspect-ratio: 9 / 16;
-  flex: 0 1 auto;
-  margin: 0;
+  height: auto;
+  /* 헤더·여백 제외한 화면 안에서만 크게 — 무한 높이 계산 방지 */
+  max-height: min(78vh, calc(100vh - 8.5rem));
+  max-height: min(78vh, calc(100dvh - 8.5rem));
+  flex: 0 0 auto;
+}
+
+/* 세로 모달 안 콘텐츠: 그리드 셀 높이를 쓰고 cover (flex 대체요소 이슈 회피) */
+.live-screen-modal--portrait .live-screen-zone--portrait {
+  display: block;
+}
+
+.live-screen-modal--portrait .live-screen-zone-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.live-screen-modal--portrait .live-screen-zone-html {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: none;
 }
 
 .live-screen-modal-stream-empty {
