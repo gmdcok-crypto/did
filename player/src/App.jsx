@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   getDeviceId,
   setDeviceId,
@@ -469,6 +469,17 @@ export default function App() {
   /** 첫 스케줄 응답 전·요청 중 — 오류는 아님 */
   const scheduleLoading = Boolean(deviceId && schedule === null && !error)
 
+  /** 스케줄은 왔지만 캠페인/콘텐츠가 비어 placeholder만 → ‘안 나옴’으로 느껴지는 경우 */
+  const scheduleHasPlayableItems = useMemo(() => {
+    if (!schedule?.zones?.length) return false
+    return schedule.zones.some((z) =>
+      (z.items || []).some((it) => it && it.type && it.type !== 'placeholder'),
+    )
+  }, [schedule])
+  const showNoContentHint = Boolean(
+    schedule && !scheduleHasPlayableItems && !scheduleLoading && !scheduleLoadError,
+  )
+
   const goHardReset = () => {
     const u = new URL(window.location.href)
     u.searchParams.set('reset', '1')
@@ -544,6 +555,18 @@ export default function App() {
         </div>
       )}
       {!online && <div className="offline-banner">오프라인 재생 중</div>}
+      {showNoContentHint && (
+        <div className="player-no-content-banner" role="status">
+          <strong>재생할 콘텐츠가 없습니다.</strong>
+          <span className="player-no-content-banner-sub">
+            CMS에서 이 기기의 <strong>디바이스 그룹</strong>에 맞는 <strong>활성 스케줄</strong>과{' '}
+            <strong>캠페인·콘텐츠</strong>를 넣었는지 확인하세요.
+          </span>
+          <a className="player-no-content-banner-link" href="/admin/" target="_blank" rel="noreferrer">
+            관리자 열기 (/admin/)
+          </a>
+        </div>
+      )}
       <div
         ref={zonesRef}
         className="player-zones"

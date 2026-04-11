@@ -174,8 +174,48 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #555;
-  font-size: 1.2rem;
+  color: #94a3b8;
+  font-size: clamp(1.05rem, 2.8vw, 1.65rem);
+  font-weight: 600;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+/* 스케줄은 있는데 미디어가 없을 때 — 검은 화면만 보이는 것처럼 느껴지는 경우 안내 */
+.player-no-content-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(30, 58, 138, 0.97) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border-bottom: 1px solid rgba(129, 140, 248, 0.45);
+  color: #e0e7ff;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.75rem;
+  text-align: center;
+}
+
+.player-no-content-banner strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.player-no-content-banner-sub {
+  flex: 1 1 100%;
+  opacity: 0.95;
+}
+
+.player-no-content-banner-link {
+  color: #fde68a;
+  text-decoration: underline;
+  font-weight: 600;
 }
 
 .media {
