@@ -18,10 +18,10 @@ git reset --hard origin/main
 | 항목 | 값 |
 |------|-----|
 | 브랜치 | `main` |
-| 짧은 해시 | `83fa436` |
-| 전체 해시 | `83fa43664965066361c7b43ba0e73f20ad3a5789` |
-| 커밋 시각 | 2026-04-11 23:29:15 +0900 |
-| 제목 | docs: git-point 복원 기준을 최신 main(7ff0723)으로 갱신 |
+| 짧은 해시 | `dce5f36` |
+| 전체 해시 | `dce5f36ff328636eb5e75b760925072f1a8a4812` |
+| 커밋 시각 | 2026-04-11 23:30:32 +0900 |
+| 제목 | docs: git-point 복원 해시·reset 명령을 bafbf89로 정리 |
 
 **참고:** 플레이어 코드만 기준으로 할 때는 `8ca1e6b` (`chore(player): remove unused currentContentRef…`) 등 아래 표를 보면 됩니다.
 
@@ -32,7 +32,7 @@ git reset --hard origin/main
 ```bash
 git fetch origin
 git checkout main
-git reset --hard 83fa43664965066361c7b43ba0e73f20ad3a5789
+git reset --hard dce5f36ff328636eb5e75b760925072f1a8a4812
 ```
 
 **원격 `main`도 같은 커밋으로 맞춰야 할 때 (강제 푸시 — 팀과 합의 후):**
@@ -45,7 +45,7 @@ git push origin main --force-with-lease
 
 ```bash
 git fetch origin
-git checkout -b restore/2026-04-11 83fa436
+git checkout -b restore/2026-04-11-dce5f36
 ```
 
 ## 최근 마일스톤 (요약)
