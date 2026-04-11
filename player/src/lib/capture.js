@@ -1,6 +1,6 @@
 /**
  * 플레이어 .player-zones 영역을 JPEG Blob으로 캡처 (video/img). iframe·크로스오리진 제한 시 영역 스킵.
- * crossOrigin 미설정 시 다른 출처 비디오는 canvas drawImage 가 막혀 검은 화면만 나올 수 있음 → mediaCrossOrigin.js 와 함께 사용.
+ * R2 등 외부 URL은 CORS 없이 표시하도록 crossOrigin 을 쓰지 않음 → canvas drawImage 가 막힐 수 있음(캡처만 제한).
  */
 function waitNextPaint() {
   return new Promise((resolve) => {
