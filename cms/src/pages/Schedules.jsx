@@ -117,7 +117,10 @@ export default function Schedules() {
           device_group_id: gid,
           layout_id: layout_id || 'full',
           layout_config: layout_id === 'full'
-            ? { content_ids: addForm.layout_config?.content_ids || [] }
+            ? (() => {
+                const ids = addForm.layout_config?.content_ids || []
+                return ids.length > 0 ? { content_ids: ids } : {}
+              })()
             : (layout_id === 'split_h' || layout_id === 'split_v') ? addForm.layout_config : null,
         }),
       })
@@ -188,7 +191,10 @@ export default function Schedules() {
           device_group_id: gid,
         layout_id: layout_id || 'full',
         layout_config: layout_id === 'full'
-          ? { content_ids: editForm.layout_config?.content_ids || [] }
+          ? (() => {
+              const ids = editForm.layout_config?.content_ids || []
+              return ids.length > 0 ? { content_ids: ids } : {}
+            })()
           : (layout_id === 'split_h' || layout_id === 'split_v') ? editForm.layout_config : null,
           is_active: !!is_active,
         }),

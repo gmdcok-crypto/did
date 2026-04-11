@@ -41,6 +41,20 @@ def _media_url_for_request(url: str, base_url: str) -> str:
     return url
 
 
+def _non_empty_content_id_list(raw) -> Optional[list]:
+    """
+    layout_config['content_ids'] 는 CMS가 항상 보내는데, 비어 있으면 캠페인 전체로 폴백해야 함.
+    문자열·단일 숫자 등 잘못된 타입은 truthy 로 잘못 분기되어 재생 목록이 비는 경우가 있어
+    리스트/튜플이면서 길이 > 0 일 때만 사용한다.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, (list, tuple)):
+        ids = [x for x in raw if x is not None]
+        return ids if len(ids) > 0 else None
+    return None
+
+
 async def _schedule_events_generator():
     q = subscribe_schedule()
     try:
@@ -152,7 +166,7 @@ async def get_schedule(
     # 풀 레이아웃 + 비어 있지 않은 content_ids → 스케줄에서 고른 콘텐츠만 사용 (캠페인 소속 무시)
     # CMS는 full 레이아웃에 항상 content_ids 키를 넣고 [] 를 보냄 → 키만 보면 빈 재생목록이 되어
     # 캠페인 미디어가 전부 빠지는 버그가 있었음. [] 는 "선택 없음"으로 캠페인 전체 재생으로 폴백.
-    full_ordered_ids = layout_config.get("content_ids") if layout_config else None
+    full_ordered_ids = _non_empty_content_id_list(layout_config.get("content_ids") if layout_config else None)
     if (schedule.layout_id or "full") == "full" and full_ordered_ids:
         order_ids = full_ordered_ids
         result = await db.execute(select(Content).where(Content.id.in_(order_ids)))
@@ -187,8 +201,9 @@ async def get_schedule(
             }
             for _, c in rows
         ]
-        if (schedule.layout_id or "full") == "full" and layout_config.get("content_ids"):
-            order_ids = layout_config["content_ids"]
+        ordered = _non_empty_content_id_list(layout_config.get("content_ids"))
+        if (schedule.layout_id or "full") == "full" and ordered:
+            order_ids = ordered
             by_id = {it["id"]: it for it in contents_ordered}
             contents = [by_id[cid] for cid in order_ids if cid in by_id]
             if order_ids:
@@ -197,6 +212,26 @@ async def get_schedule(
                         contents.append(it)
         else:
             contents = contents_ordered
+
+    # 직접 지정한 ID가 삭제됐거나 잘못된 JSON이면 contents 가 비어 있음 → 캠페인으로 폴백
+    if not contents:
+        result = await db.execute(
+            select(CampaignContent, Content)
+            .join(Content, CampaignContent.content_id == Content.id)
+            .where(CampaignContent.campaign_id == campaign.id)
+            .order_by(CampaignContent.order)
+        )
+        rows = result.all()
+        contents = [
+            {
+                "id": c.id,
+                "type": c.type,
+                "url": _media_url_for_request(c.url, base_url),
+                "duration_sec": c.duration_sec,
+                "name": c.name,
+            }
+            for _, c in rows
+        ]
 
     async def get_contents_for_zone(zone_config):
         content_ids = zone_config.get("content_ids")
