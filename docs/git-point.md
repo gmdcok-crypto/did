@@ -3,17 +3,27 @@
 문제 발생 시 **아래 커밋으로 되돌릴 기준점**으로 사용합니다.  
 배포·머지 후에는 이 표를 최신 `main` HEAD에 맞춰 갱신하세요.
 
-## 복원 기준 커밋 (마지막 확정)
+## 원격 `main` 최신과 동일하게 맞추기 (일반)
+
+서버/다른 PC와 같은 **최신 `main`**만 맞추면 될 때:
+
+```bash
+git fetch origin
+git checkout main
+git reset --hard origin/main
+```
+
+## 복원 기준 커밋 (문서에 기록한 스냅샷)
 
 | 항목 | 값 |
 |------|-----|
 | 브랜치 | `main` |
-| 짧은 해시 | `7ff0723` |
-| 전체 해시 | `7ff0723f7607bbb42359aef634e1b27dcaa6f580` |
-| 커밋 시각 | 2026-04-11 23:28:33 +0900 |
-| 제목 | docs: git-point.md 복원 시점용 HEAD·복원 명령 |
+| 짧은 해시 | `83fa436` |
+| 전체 해시 | `83fa43664965066361c7b43ba0e73f20ad3a5789` |
+| 커밋 시각 | 2026-04-11 23:29:15 +0900 |
+| 제목 | docs: git-point 복원 기준을 최신 main(7ff0723)으로 갱신 |
 
-**직전 앱 코드만** 기준으로 되돌리려면 (이 문서 파일 추가 이전): `8ca1e6b` — `chore(player): remove unused currentContentRef prop chain`
+**참고:** 플레이어 코드만 기준으로 할 때는 `8ca1e6b` (`chore(player): remove unused currentContentRef…`) 등 아래 표를 보면 됩니다.
 
 ## 이 커밋으로 복원하는 방법
 
@@ -22,7 +32,7 @@
 ```bash
 git fetch origin
 git checkout main
-git reset --hard 7ff0723f7607bbb42359aef634e1b27dcaa6f580
+git reset --hard 83fa43664965066361c7b43ba0e73f20ad3a5789
 ```
 
 **원격 `main`도 같은 커밋으로 맞춰야 할 때 (강제 푸시 — 팀과 합의 후):**
@@ -35,7 +45,7 @@ git push origin main --force-with-lease
 
 ```bash
 git fetch origin
-git checkout -b restore/2026-04-11 7ff0723
+git checkout -b restore/2026-04-11 83fa436
 ```
 
 ## 최근 마일스톤 (요약)
@@ -58,3 +68,5 @@ git log -1 --format="%H%n%h%n%ci%n%s"
 ```
 
 출력된 전체 해시·짧은 해시·시각·제목을 위 표에 반영합니다.
+
+**이 문서만 수정해 커밋하면** 새 커밋이 생기므로, 복원 기준을 그 커밋으로 옮기려면 위 명령을 한 번 더 실행해 표를 맞춥니다.
