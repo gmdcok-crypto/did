@@ -803,6 +803,7 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   const [prevIndex, setPrevIndex] = useState(null)
   const prevIndexRef = useRef(index)
   const clearPrevTimerRef = useRef(null)
+  const livePayloadRef = useRef(null)
   const len = items.length
   const item = len > 0 ? items[index % len] : undefined
   const duration = (item?.duration_sec || 10) * 1000
@@ -829,6 +830,23 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
     setPrevIndex(null)
   }, [])
 
+  const onLiveIntrinsicSize = useCallback(
+    (w, h) => {
+      if (!onLiveZoneMedia || !zone?.id) return
+      const base = livePayloadRef.current
+      if (!base?.url) return
+      if (!(w > 0) || !(h > 0)) return
+      const orientation = h > w ? 'portrait' : 'landscape'
+      onLiveZoneMedia(zone?.id, {
+        ...base,
+        orientation,
+        mediaWidth: w,
+        mediaHeight: h,
+      })
+    },
+    [onLiveZoneMedia, zone?.id],
+  )
+
   useEffect(() => {
     if (!onLiveZoneMedia) return
     if (
@@ -837,6 +855,7 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
       item?.type === 'placeholder' ||
       !item
     ) {
+      livePayloadRef.current = null
       onLiveZoneMedia(zone?.id, null)
       return
     }
@@ -845,10 +864,13 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
         ? (mediaBaseUrl || '') + item.url
         : item?.url || ''
     if (!absUrl) {
+      livePayloadRef.current = null
       onLiveZoneMedia(zone?.id, null)
       return
     }
-    onLiveZoneMedia(zone?.id, { type: item.type, url: absUrl })
+    const payload = { type: item.type, url: absUrl }
+    livePayloadRef.current = payload
+    onLiveZoneMedia(zone?.id, payload)
     return () => onLiveZoneMedia(zone?.id, null)
   }, [
     onLiveZoneMedia,
@@ -915,12 +937,15 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
         className={item?.type === 'image' ? 'media-wrap media-wrap-image-fade' : 'media-wrap'}
       >
         <MediaBlock
-          item={item}
-          reportEvent={reportEvent}
-          mediaBaseUrl={mediaBaseUrl}
-          onReady={clearPrevWhenReady}
-          onVideoEnded={item?.type === 'video' ? advance : undefined}
-        />
+            item={item}
+            reportEvent={reportEvent}
+            mediaBaseUrl={mediaBaseUrl}
+            onReady={clearPrevWhenReady}
+            onVideoEnded={item?.type === 'video' ? advance : undefined}
+            onIntrinsicSize={
+              item?.type === 'video' || item?.type === 'image' ? onLiveIntrinsicSize : undefined
+            }
+          />
       </div>
       {nextItem && nextItem.type === 'video' && nextItem.id !== item?.id && (
         <NextVideoPreload item={nextItem} mediaBaseUrl={mediaBaseUrl} />
@@ -952,7 +977,7 @@ function parseContentIdForEvents(id) {
   return null
 }
 
-function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded }) {
+function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, onIntrinsicSize }) {
   const hasReported = useRef(false)
   const videoRef = useRef(null)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
@@ -982,6 +1007,13 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded }) 
     return () => el.removeEventListener('canplay', tryPlay)
   }, [item?.type, url])
 
+  const reportIntrinsic = useCallback(
+    (w, h) => {
+      if (w > 0 && h > 0) onIntrinsicSize?.(w, h)
+    },
+    [onIntrinsicSize],
+  )
+
   if (!item) {
     return (
       <div className="zone-placeholder">
@@ -1008,6 +1040,10 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded }) 
         muted
         playsInline
         preload="auto"
+        onLoadedMetadata={(e) => {
+          const el = e.target
+          reportIntrinsic(el.videoWidth, el.videoHeight)
+        }}
         onCanPlay={() => onReady?.()}
         onLoadedData={() => onReady?.()}
         onPlay={() => onReady?.()}
@@ -1034,7 +1070,11 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded }) 
         src={url}
         crossOrigin={mediaCrossOrigin}
         alt=""
-        onLoad={() => onReady?.()}
+        onLoad={(e) => {
+          const el = e.target
+          reportIntrinsic(el.naturalWidth, el.naturalHeight)
+          onReady?.()
+        }}
         onError={() => {
           logMediaLoadFailure('image', logId, url)
           if (contentIdInt != null) reportEvent(contentIdInt, 'error')

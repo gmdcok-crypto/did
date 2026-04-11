@@ -1016,6 +1016,19 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   background: #0a0a0b;
 }
 
+/* 플레이어가 보낸 intrinsic 비율(세로 영상·이미지): 셀 높이 기준으로 맞춰 가로폭 자동 */
+.live-screen-zone--portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.live-screen-zone--portrait .live-screen-zone-media {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+}
+
 .live-screen-zone-placeholder {
   display: flex;
   align-items: center;

@@ -36,7 +36,14 @@ function LiveStreamManifestView({ manifest }) {
       }}
     >
       {zones.map((z) => (
-        <div key={String(z.id)} className="live-screen-zone">
+        <div
+          key={String(z.id)}
+          className={
+            z.current?.orientation === 'portrait'
+              ? 'live-screen-zone live-screen-zone--portrait'
+              : 'live-screen-zone'
+          }
+        >
           <LiveZoneMedia current={z.current} />
         </div>
       ))}
@@ -175,7 +182,7 @@ export default function Devices() {
     liveDevicePk: null,
     ticket: null,
     prevBlobUrl: null,
-    /** @type {null | { t: string, v?: number, layout_id?: string, zones?: Array<{ id: string, ratio?: number, current: null | { type: string, url: string } }> }} */
+    /** @type {null | { t: string, v?: number, layout_id?: string, zones?: Array<{ id: string, ratio?: number, current: null | { type: string, url: string, orientation?: string, mediaWidth?: number, mediaHeight?: number } }> }} */
     liveManifest: null,
   })
   const livePollAbortRef = useRef(0)
