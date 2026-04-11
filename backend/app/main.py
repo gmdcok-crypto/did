@@ -15,6 +15,8 @@ from app.routers import auth, devices, player, events, contents, campaigns, sche
 from app.models import User
 from app.auth import get_password_hash
 from app.stale_device_broadcaster import run_stale_device_broadcaster
+from app.sse_broadcast import run_redis_sse_bridge
+from app.live_screen_stream import check_redis_live_screen
 
 
 class RailwayHealthMiddleware:
@@ -114,6 +116,16 @@ async def init_db():
 
             await conn.run_sync(add_device_live_screen_cols_mysql)
 
+async def _log_live_screen_redis_status() -> None:
+    """기동 직후 Redis 실시간 화면 설정 여부를 한 번 로그 (진단용)."""
+    await asyncio.sleep(3.0)
+    try:
+        info = await check_redis_live_screen()
+        print(f"[live_screen] redis: {info}")
+    except Exception as e:
+        print(f"[live_screen] redis status check failed: {e}")
+
+
 async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0) -> bool:
     """MySQL/MariaDB 기동 지연·네트워크 대비해 create_all 재시도. 성공 시 True."""
     last_err: Exception | None = None
@@ -161,6 +173,8 @@ async def lifespan(app: FastAPI):
         os.makedirs(s.upload_dir, exist_ok=True)
         asyncio.create_task(_background_startup_db())
         asyncio.create_task(run_stale_device_broadcaster())
+        asyncio.create_task(run_redis_sse_bridge())
+        asyncio.create_task(_log_live_screen_redis_status())
     except Exception as e:
         print(f"lifespan prep failed (server still binds): {e}")
     yield
@@ -189,6 +203,12 @@ async def no_store_api_json(request: Request, call_next):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/live-screen")
+async def health_live_screen():
+    """멀티 인스턴스 실시간 화면: Redis 연결 여부 확인용."""
+    return await check_redis_live_screen()
 
 
 @app.head("/health")

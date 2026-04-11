@@ -391,7 +391,7 @@ export default function App() {
     }
 
     liveScreenTickRef.current = tick
-    pollTimer = setInterval(tick, 850)
+    pollTimer = setInterval(tick, 400)
     tick()
     return () => {
       cancelled = true

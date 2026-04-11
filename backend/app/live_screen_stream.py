@@ -91,6 +91,35 @@ async def get_redis():
     return _redis
 
 
+async def check_redis_live_screen() -> dict:
+    """헬스/진단: 멀티 인스턴스 실시간 화면에 Redis 필요 여부."""
+    url = (get_settings().redis_url or "").strip()
+    if not url:
+        return {
+            "redis_configured": False,
+            "redis_ping_ok": None,
+            "detail": "REDIS_URL unset — multi-instance live screen needs Redis + pub/sub",
+        }
+    if aioredis is None:
+        return {
+            "redis_configured": True,
+            "redis_ping_ok": False,
+            "detail": "redis package not installed",
+        }
+    try:
+        r = await get_redis()
+        if not r:
+            return {
+                "redis_configured": True,
+                "redis_ping_ok": False,
+                "detail": "client not created",
+            }
+        await r.ping()
+        return {"redis_configured": True, "redis_ping_ok": True, "detail": "ok"}
+    except Exception as e:
+        return {"redis_configured": True, "redis_ping_ok": False, "detail": str(e)}
+
+
 async def push_frame(device_id: str, jpeg: bytes) -> None:
     """플레이어가 보낸 JPEG: Redis 우선, 실패 시 인메모리 허브."""
     if len(jpeg) < 32:

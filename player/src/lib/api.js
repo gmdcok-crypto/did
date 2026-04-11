@@ -1,5 +1,17 @@
 export const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:8000/api')
 
+/** API_BASE 와 동일 호스트의 WebSocket origin (실시간 화면 push URL용) */
+export function getWebSocketApiOrigin() {
+  if (typeof window === 'undefined') return 'ws://localhost:8000'
+  const v = import.meta.env.VITE_API_URL
+  if (v && /^https?:\/\//i.test(String(v))) {
+    const u = new URL(String(v).replace(/\/api\/?$/, ''))
+    return (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host
+  }
+  const loc = window.location
+  return (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host
+}
+
 /** 미디어(/uploads/...) 요청용 백엔드 주소. 상대 경로일 때 이미지가 나오도록 함 */
 export function getMediaBaseUrl() {
   if (import.meta.env.VITE_API_URL) {
@@ -265,17 +277,7 @@ export function getScheduleEventsUrl() {
 
 /** CMS 실시간 화면 스트리밍: 플레이어 → 서버 WebSocket 송신 URL */
 export function getLiveScreenPushWsUrl(deviceId, ticket) {
-  let origin
-  const v = import.meta.env.VITE_API_URL
-  if (v && /^https?:\/\//i.test(String(v))) {
-    const u = new URL(String(v).replace(/\/api\/?$/, ''))
-    origin = (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host
-  } else if (typeof window !== 'undefined') {
-    const loc = window.location
-    origin = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host
-  } else {
-    origin = 'ws://localhost:8000'
-  }
+  const origin = getWebSocketApiOrigin()
   const url = new URL('/api/player/ws/live-screen', origin)
   url.searchParams.set('device_id', deviceId)
   url.searchParams.set('ticket', ticket)

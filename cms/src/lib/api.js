@@ -1,5 +1,18 @@
 export const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
+/** `fetch(\`\${API_BASE}/...\`)` 과 동일한 API 호스트로 WebSocket origin (혼합 콘텐츠·잘못된 호스트 방지) */
+export function getWebSocketApiOrigin() {
+  if (typeof window === 'undefined') return 'ws://localhost:8000'
+  const apiBase = import.meta.env.VITE_API_URL || '/api'
+  const s = String(apiBase)
+  if (/^https?:\/\//i.test(s)) {
+    const u = new URL(s.replace(/\/api\/?$/, ''))
+    return (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host
+  }
+  const loc = window.location
+  return (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host
+}
+
 /** `/uploads/...` 절대 URL (로컬은 Vite 프록시 origin, 운영은 API와 동일 호스트) */
 export function getUploadsOrigin() {
   const apiUrl = import.meta.env.VITE_API_URL
@@ -12,17 +25,7 @@ export function getUploadsOrigin() {
 
 /** CMS 실시간 화면: 서버에서 JPEG 스트림을 받는 WebSocket URL */
 export function getLiveViewWsUrl(devicePk, ticket, token) {
-  let origin
-  const v = import.meta.env.VITE_API_URL
-  if (v && /^https?:\/\//i.test(String(v))) {
-    const u = new URL(String(v).replace(/\/api\/?$/, ''))
-    origin = (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host
-  } else if (typeof window !== 'undefined') {
-    const loc = window.location
-    origin = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host
-  } else {
-    origin = 'ws://localhost:8000'
-  }
+  const origin = getWebSocketApiOrigin()
   const url = new URL('/api/devices/ws/live-screen', origin)
   url.searchParams.set('device_pk', String(devicePk))
   url.searchParams.set('ticket', ticket)
