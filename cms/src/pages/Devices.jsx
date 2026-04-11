@@ -849,7 +849,11 @@ export default function Devices() {
           onClick={closeLiveModal}
         >
           <div
-            className="live-screen-modal"
+            className={
+              liveModal.liveManifest?.layout_id === 'full_portrait'
+                ? 'live-screen-modal live-screen-modal--portrait'
+                : 'live-screen-modal'
+            }
             role="dialog"
             aria-modal="true"
             aria-labelledby="live-screen-title"
