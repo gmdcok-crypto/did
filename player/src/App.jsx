@@ -223,7 +223,7 @@ export default function App() {
         /* 네트워크 오류 무시 */
       }
     }
-    const id = setInterval(tick, 8000)
+    const id = setInterval(tick, 3000)
     tick()
     return () => {
       cancelled = true
@@ -279,64 +279,6 @@ export default function App() {
   const openSettings = () => {
     setRegisterError('')
     setShowSettings(true)
-  }
-
-  if (error && !schedule) {
-    return (
-      <>
-      <div className="player-full error-screen">
-        <div className="player-settings-wrap">
-          <button type="button" className="player-settings-btn" onClick={openSettings} title="디바이스 등록">
-            ⚙
-          </button>
-          {showSettings && (
-            <div className="player-settings-panel">
-              <p className="player-settings-hint" style={{ marginBottom: '0.75rem' }}>
-                인증코드·이름·위치를 입력하고 등록하면 디바이스 목록에 표시됩니다.
-              </p>
-              <label>인증코드 (필수)</label>
-              <input
-                type="text"
-                value={registerAuthCode}
-                onChange={(e) => setRegisterAuthCode(e.target.value)}
-                placeholder="회사에서 안내한 인증코드"
-              />
-              <label>이름</label>
-              <input
-                type="text"
-                value={registerName}
-                onChange={(e) => setRegisterName(e.target.value)}
-                placeholder="예: 1층 로비 키오스크"
-              />
-              <label>위치</label>
-              <input
-                type="text"
-                value={registerLocation}
-                onChange={(e) => setRegisterLocation(e.target.value)}
-                placeholder="예: 본점 1층"
-              />
-              <div className="player-settings-actions">
-                <button type="button" className="btn btn-sm btn-primary" onClick={doRegister}>
-                  등록
-                </button>
-                <button type="button" className="btn btn-sm" onClick={() => setShowSettings(false)}>
-                  닫기
-                </button>
-              </div>
-              {registerError && <p className="player-settings-error">{registerError}</p>}
-            </div>
-          )}
-        </div>
-        <p>오프라인 또는 서버 연결 실패</p>
-        <p className="small">{error}</p>
-        <p className="small">백엔드가 실행 중이면 우측 상단 ⚙에서 인증코드로 디바이스를 등록하세요.</p>
-        <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => loadSchedule()}>
-          다시 시도
-        </button>
-      </div>
-      <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
-      </>
-    )
   }
 
   if (!deviceId) {
@@ -401,9 +343,68 @@ export default function App() {
       ? schedule.zones
       : [{ id: 'zone_1', ratio: 1, content_type: 'placeholder', items: [] }]
 
+  const zoneRatio = (z) => {
+    const r = Number(z?.ratio)
+    return Number.isFinite(r) && r > 0 ? r : 1
+  }
+
+  const scheduleLoadError = Boolean(error && !schedule)
+
   return (
     <>
     <div className="player-full">
+      {scheduleLoadError && (
+        <div className="player-schedule-error-overlay player-full error-screen">
+          <div className="player-settings-wrap">
+            <button type="button" className="player-settings-btn" onClick={openSettings} title="디바이스 등록">
+              ⚙
+            </button>
+            {showSettings && (
+              <div className="player-settings-panel">
+                <p className="player-settings-hint" style={{ marginBottom: '0.75rem' }}>
+                  인증코드·이름·위치를 입력하고 등록하면 디바이스 목록에 표시됩니다.
+                </p>
+                <label>인증코드 (필수)</label>
+                <input
+                  type="text"
+                  value={registerAuthCode}
+                  onChange={(e) => setRegisterAuthCode(e.target.value)}
+                  placeholder="회사에서 안내한 인증코드"
+                />
+                <label>이름</label>
+                <input
+                  type="text"
+                  value={registerName}
+                  onChange={(e) => setRegisterName(e.target.value)}
+                  placeholder="예: 1층 로비 키오스크"
+                />
+                <label>위치</label>
+                <input
+                  type="text"
+                  value={registerLocation}
+                  onChange={(e) => setRegisterLocation(e.target.value)}
+                  placeholder="예: 본점 1층"
+                />
+                <div className="player-settings-actions">
+                  <button type="button" className="btn btn-sm btn-primary" onClick={doRegister}>
+                    등록
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={() => setShowSettings(false)}>
+                    닫기
+                  </button>
+                </div>
+                {registerError && <p className="player-settings-error">{registerError}</p>}
+              </div>
+            )}
+          </div>
+          <p>오프라인 또는 서버 연결 실패</p>
+          <p className="small">{error}</p>
+          <p className="small">백엔드가 실행 중이면 우측 상단 ⚙에서 인증코드로 디바이스를 등록하세요.</p>
+          <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => loadSchedule()}>
+            다시 시도
+          </button>
+        </div>
+      )}
       {!online && <div className="offline-banner">오프라인 재생 중</div>}
       <div
         ref={zonesRef}
@@ -412,15 +413,13 @@ export default function App() {
           display: 'grid',
           ...(schedule?.layout_id === 'split_v'
             ? {
-                gridTemplateRows: zones.map((z) => `${z.ratio * 100}fr`).join(' '),
+                gridTemplateRows: zones.map((z) => `${zoneRatio(z) * 100}fr`).join(' '),
                 gridTemplateColumns: '1fr',
               }
             : {
-                gridTemplateColumns: zones.map((z) => `${z.ratio * 100}fr`).join(' '),
+                gridTemplateColumns: zones.map((z) => `${zoneRatio(z) * 100}fr`).join(' '),
               }),
           gap: 0,
-          width: '100%',
-          height: '100%',
         }}
       >
         {zones.map((zone) => (

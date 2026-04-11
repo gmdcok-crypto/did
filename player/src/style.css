@@ -31,6 +31,15 @@ body {
   text-align: center;
 }
 
+/* 스케줄 로드 실패 시에도 아래 .player-zones 가 유지되어 CMS 실시간 화면 캡처 가능 */
+.player-schedule-error-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.94);
+  pointer-events: auto;
+}
+
 .player-full.error-screen .small {
   font-size: 0.9rem;
   color: #888;
@@ -49,9 +58,15 @@ body {
   z-index: 10;
 }
 
+/* flex(.player-full)의 align-items:center 때문에 높이 0으로 붕괴 → 검은 화면만 보이는 현상 방지 */
 .player-zones {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  z-index: 0;
 }
 
 .zone {
