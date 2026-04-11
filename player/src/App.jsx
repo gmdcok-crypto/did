@@ -134,7 +134,6 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [stuckHint, setStuckHint] = useState(false)
   const eventQueueRef = useRef(getEventQueue())
-  const currentContentRef = useRef(null)
   const zonesRef = useRef(null)
   const deviceIdRef = useRef(deviceId)
   const liveScreenTickRef = useRef(async () => {})
@@ -637,7 +636,6 @@ export default function App() {
             key={zone.id != null ? String(zone.id) : `zone-${zi}`}
             zone={zone}
             reportEvent={reportEvent}
-            currentContentRef={currentContentRef}
             mediaBaseUrl={getMediaBaseUrl()}
           />
         ))}
@@ -648,7 +646,7 @@ export default function App() {
   )
 }
 
-function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
+function Zone({ zone, reportEvent, mediaBaseUrl }) {
   // zone 이 잠깐 비어 있으면 destructuring 이 훅보다 먼저 throw → 다음 렌더에서 훅 개수 불일치(React #310)
   const content_type = zone?.content_type
   const items = zone?.items ?? []
@@ -727,7 +725,6 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
           <MediaBlock
             item={prevItem}
             reportEvent={reportEvent}
-            currentContentRef={currentContentRef}
             mediaBaseUrl={mediaBaseUrl}
           />
         </div>
@@ -739,7 +736,6 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
         <MediaBlock
           item={item}
           reportEvent={reportEvent}
-          currentContentRef={currentContentRef}
           mediaBaseUrl={mediaBaseUrl}
           onReady={clearPrevWhenReady}
           onVideoEnded={item?.type === 'video' ? advance : undefined}
@@ -775,7 +771,7 @@ function parseContentIdForEvents(id) {
   return null
 }
 
-function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady, onVideoEnded }) {
+function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded }) {
   const hasReported = useRef(false)
   const videoRef = useRef(null)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
