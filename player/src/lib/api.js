@@ -290,37 +290,12 @@ export async function pollLiveScreenCapture(deviceId) {
   if (!res.ok) return { capture: false }
   const data = await res.json()
   if (data?.capture && data?.ticket) {
-    console.log('[DID player] live-screen-poll 캡처 요청 수신', {
+    console.log('[DID player] live-screen-poll 실시간 화면 요청 수신', {
       device_id: deviceId,
       ticket: `${String(data.ticket).slice(0, 8)}…`,
     })
   }
   return data
-}
-
-export async function uploadLiveScreen(deviceId, ticket, blob) {
-  console.log('[DID player] live-screen-upload 시도', { device_id: deviceId, ticket: `${String(ticket).slice(0, 8)}…` })
-  const url = `${API_BASE}/player/live-screen-upload`
-  let delay = 400
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const fd = new FormData()
-    fd.append('device_id', deviceId)
-    fd.append('ticket', ticket)
-    fd.append('file', blob, 'screen.jpg')
-    const res = await fetch(url, {
-      method: 'POST',
-      body: fd,
-      cache: 'no-store',
-    })
-    if (res.ok) return true
-    try {
-      const errText = await res.text()
-      console.warn('[DID player] live-screen-upload 실패', res.status, errText?.slice(0, 200))
-    } catch (_) {}
-    if (attempt < 3) await new Promise((r) => setTimeout(r, delay))
-    delay = Math.min(delay * 2, 2000)
-  }
-  return false
 }
 
 /**

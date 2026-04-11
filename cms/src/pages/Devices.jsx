@@ -258,8 +258,21 @@ export default function Devices() {
     const wsUrl = getLiveViewWsUrl(pk, ticket, token)
     const ws = new WebSocket(wsUrl)
     ws.binaryType = 'arraybuffer'
+    const stallMs = 45000
+    const stallTimer = setTimeout(() => {
+      setLiveModal((m) => {
+        if (!m.open || !m.loading || m.imageSrc) return m
+        return {
+          ...m,
+          loading: false,
+          error:
+            '화면이 오지 않습니다. 플레이어가 켜져 있어도, API 서버 여러 인스턴스(Railway 등)에 요청이 갈라지면 실시간 스트림이 붙지 않을 수 있습니다. 단일 인스턴스·동일 도메인에서 다시 시도하거나 네트워크·wss 차단을 확인하세요.',
+        }
+      })
+    }, stallMs)
     // onopen 에서 loading 을 끄면 첫 프레임 전에 본문이 비어 "닫기"만 보임 → 첫 JPEG 수신 시에만 로딩 해제
     ws.onmessage = (ev) => {
+      clearTimeout(stallTimer)
       const blob = new Blob([ev.data], { type: 'image/jpeg' })
       const url = URL.createObjectURL(blob)
       setLiveModal((m) => {
@@ -268,25 +281,30 @@ export default function Devices() {
       })
     }
     ws.onerror = () => {
+      clearTimeout(stallTimer)
       setLiveModal((m) => ({
         ...m,
         loading: false,
-        error: m.error || '실시간 스트림 연결에 실패했습니다. 플레이어가 켜져 있는지 확인하세요.',
+        error:
+          m.error ||
+          'WebSocket 연결에 실패했습니다. 같은 도메인의 API인지, wss 차단·프록시를 확인하세요.',
       }))
     }
     ws.onclose = () => {
+      clearTimeout(stallTimer)
       setLiveModal((m) => {
         if (!m.open) return m
         if (m.imageSrc) return m
         return {
           ...m,
           loading: false,
-          error: m.error || '스트림이 끊겼거나 화면을 받지 못했습니다.',
+          error: m.error || '스트림이 끊겼거나 첫 화면을 받지 못했습니다.',
         }
       })
     }
     // effect 재실행·Strict Mode 시 이미지를 지우지 않음(닫기만 보이는 현상 방지). 연결만 끊고 blob 은 closeLiveModal 에서 정리
     return () => {
+      clearTimeout(stallTimer)
       try {
         ws.close()
       } catch (_) {}
@@ -524,7 +542,9 @@ export default function Devices() {
                 닫기
               </button>
             </div>
-            {liveModal.loading && <p className="live-screen-modal-status">스트림 연결 중… (플레이어가 켜져 있어야 합니다)</p>}
+            {liveModal.loading && (
+              <p className="live-screen-modal-status">실시간 화면을 불러오는 중입니다…</p>
+            )}
             {liveModal.error && <p className="live-screen-modal-error">{liveModal.error}</p>}
             {liveModal.imageSrc && (
               <div className="live-screen-modal-img-wrap">

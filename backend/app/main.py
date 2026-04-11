@@ -93,10 +93,6 @@ async def init_db():
                 for stmt in (
                     "ALTER TABLE devices ADD COLUMN live_screen_pending BOOLEAN DEFAULT 0",
                     "ALTER TABLE devices ADD COLUMN live_screen_ticket VARCHAR(64)",
-                    "ALTER TABLE devices ADD COLUMN live_screen_last_ticket VARCHAR(64)",
-                    "ALTER TABLE devices ADD COLUMN live_screen_path VARCHAR(512)",
-                    "ALTER TABLE devices ADD COLUMN live_screen_at DATETIME",
-                    "ALTER TABLE devices ADD COLUMN live_screen_jpeg BLOB",
                 ):
                     try:
                         sync_conn.execute(text(stmt))
@@ -110,10 +106,6 @@ async def init_db():
                 for stmt in (
                     "ALTER TABLE devices ADD COLUMN live_screen_pending TINYINT(1) NOT NULL DEFAULT 0",
                     "ALTER TABLE devices ADD COLUMN live_screen_ticket VARCHAR(64) NULL",
-                    "ALTER TABLE devices ADD COLUMN live_screen_last_ticket VARCHAR(64) NULL",
-                    "ALTER TABLE devices ADD COLUMN live_screen_path VARCHAR(512) NULL",
-                    "ALTER TABLE devices ADD COLUMN live_screen_at DATETIME NULL",
-                    "ALTER TABLE devices ADD COLUMN live_screen_jpeg MEDIUMBLOB NULL",
                 ):
                     try:
                         sync_conn.execute(text(stmt))
@@ -121,16 +113,6 @@ async def init_db():
                         pass
 
             await conn.run_sync(add_device_live_screen_cols_mysql)
-
-        if engine.dialect.name == "postgresql":
-            def add_live_screen_jpeg_postgres(sync_conn):
-                try:
-                    sync_conn.execute(text("ALTER TABLE devices ADD COLUMN live_screen_jpeg BYTEA NULL"))
-                except Exception:
-                    pass
-
-            await conn.run_sync(add_live_screen_jpeg_postgres)
-
 
 async def init_db_with_retry(max_attempts: int = 15, delay_seconds: float = 2.0) -> bool:
     """MySQL/MariaDB 기동 지연·네트워크 대비해 create_all 재시도. 성공 시 True."""

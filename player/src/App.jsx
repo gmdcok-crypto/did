@@ -19,7 +19,7 @@ import {
   clearAllScheduleStorageCaches,
   hardResetPlayerCaches,
 } from './lib/api'
-import { capturePlayerZones, resolveLiveCaptureRoot, capturePlaceholderBlob } from './lib/capture'
+import { liveStreamPlaceholderBlob } from './lib/liveStreamPlaceholder'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
 
 /** 스케줄 폴링 — last_seen 갱신 주기(오프라인 판정과 맞춤, 기본 2분) */
@@ -343,18 +343,7 @@ export default function App() {
     const sendFrame = async () => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return
       try {
-        const root = resolveLiveCaptureRoot(zonesRef)
-        let blob
-        if (!root) {
-          blob = await capturePlaceholderBlob('캡처 영역 없음 · 플레이어 페이지를 열었는지 확인')
-        } else {
-          blob = await capturePlayerZones(root)
-          if (!blob) {
-            blob = await capturePlaceholderBlob(
-              '미디어 캡처 실패(CORS·로딩). /uploads 동일 출처 권장.',
-            )
-          }
-        }
+        const blob = await liveStreamPlaceholderBlob()
         if (blob && ws?.readyState === WebSocket.OPEN) {
           const buf = await blob.arrayBuffer()
           ws.send(buf)
