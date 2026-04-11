@@ -58,6 +58,29 @@ function isDebugUrl() {
   return new URLSearchParams(window.location.search).get('debug') === '1'
 }
 
+/** 탭 복귀 시 일부 모바일 브라우저에서 비디오가 멈춘 채 검은 화면만 남는 현상 완화 */
+function nudgeVideoPlayback() {
+  if (typeof document === 'undefined') return
+  requestAnimationFrame(() => {
+    document.querySelectorAll('video.media-video').forEach((v) => {
+      v.play?.().catch(() => {})
+    })
+  })
+}
+
+/** bfcache(뒤로가기 복원) 후 비디오·스케줄이 꼬이는 경우 */
+function recoverMediaAfterPageShow() {
+  if (typeof document === 'undefined') return
+  requestAnimationFrame(() => {
+    document.querySelectorAll('video.media-video').forEach((v) => {
+      try {
+        v.load()
+      } catch (_) {}
+      v.play?.().catch(() => {})
+    })
+  })
+}
+
 function DebugHud({ deviceId, schedule, error, online }) {
   if (!isDebugUrl()) return null
   const apiHint = typeof window !== 'undefined' ? `${window.location.origin}/api` : ''
@@ -245,10 +268,25 @@ export default function App() {
   useEffect(() => {
     if (!deviceId) return
     const onVisible = () => {
-      if (document.visibilityState === 'visible') loadSchedule()
+      if (document.visibilityState === 'visible') {
+        loadSchedule()
+        nudgeVideoPlayback()
+      }
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [deviceId, loadSchedule])
+
+  // 모바일 Safari/Chrome: 첫 방문은 되다가 뒤로 갔다가 다시 들어오면(bfcache) 검은 화면만 남는 경우
+  useEffect(() => {
+    if (!deviceId) return
+    const onPageShow = (e) => {
+      if (!e.persisted) return
+      loadSchedule(true)
+      recoverMediaAfterPageShow()
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
   }, [deviceId, loadSchedule])
 
   useEffect(() => {

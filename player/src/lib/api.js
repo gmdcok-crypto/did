@@ -91,7 +91,20 @@ export async function fetchSchedule(deviceId, options = {}) {
   url.searchParams.set('_', String(Date.now()))
   const urlStr = url.toString()
 
-  const res = await fetch(urlStr, { cache: 'no-store' })
+  const timeoutMs = options.timeoutMs ?? 25000
+  const controller = new AbortController()
+  const tid = setTimeout(() => controller.abort(), timeoutMs)
+  let res
+  try {
+    res = await fetch(urlStr, { cache: 'no-store', signal: controller.signal })
+  } catch (e) {
+    clearTimeout(tid)
+    if (e?.name === 'AbortError') {
+      throw new Error('스케줄 요청 시간 초과(네트워크 지연·차단 가능)')
+    }
+    throw e
+  }
+  clearTimeout(tid)
   if (res.status === 404) {
     const errBody = await res.json().catch(() => ({}))
     const e = new Error(errBody.detail || 'Device not found')
