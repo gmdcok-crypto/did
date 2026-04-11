@@ -606,9 +606,9 @@ export default function App() {
           gap: 0,
         }}
       >
-        {zones.map((zone) => (
+        {(zones || []).filter((z) => z != null && typeof z === 'object').map((zone, zi) => (
           <Zone
-            key={zone.id}
+            key={zone.id != null ? String(zone.id) : `zone-${zi}`}
             zone={zone}
             reportEvent={reportEvent}
             currentContentRef={currentContentRef}
@@ -623,24 +623,27 @@ export default function App() {
 }
 
 function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
-  const { content_type, items } = zone
+  // zone 이 잠깐 비어 있으면 destructuring 이 훅보다 먼저 throw → 다음 렌더에서 훅 개수 불일치(React #310)
+  const content_type = zone?.content_type
+  const items = zone?.items ?? []
   const [index, setIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(null)
   const prevIndexRef = useRef(index)
   const clearPrevTimerRef = useRef(null)
-  const item = items[index % (items.length || 1)]
+  const len = items.length
+  const item = len > 0 ? items[index % len] : undefined
   const duration = (item?.duration_sec || 10) * 1000
 
   const advance = useCallback(() => {
-    setIndex((i) => (i + 1) % items.length)
-  }, [items.length])
+    setIndex((i) => (len > 0 ? (i + 1) % len : 0))
+  }, [len])
 
   // 이미지·HTML 등: 슬롯 시간(duration_sec)마다 다음 미디어. 영상은 재생 끝(onEnded)에서만 넘김.
   useEffect(() => {
     if (!items?.length) return
     if (item?.type === 'video') return
     const t = setInterval(() => {
-      setIndex((i) => (i + 1) % items.length)
+      setIndex((i) => (items.length > 0 ? (i + 1) % items.length : 0))
     }, duration)
     return () => clearInterval(t)
   }, [items?.length, duration, item?.type, item?.id])
@@ -724,7 +727,7 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
 }
 
 function NextVideoPreload({ item, mediaBaseUrl }) {
-  const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
+  const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
   if (!url) return null
   const xo = crossOriginForMediaUrl(url)
   return (
@@ -749,10 +752,10 @@ function parseContentIdForEvents(id) {
 function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady, onVideoEnded }) {
   const hasReported = useRef(false)
   const videoRef = useRef(null)
-  const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
+  const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
   const mediaCrossOrigin = crossOriginForMediaUrl(url)
-  const contentIdInt = parseContentIdForEvents(item.id)
-  const logId = item.id ?? item.url ?? ''
+  const contentIdInt = parseContentIdForEvents(item?.id)
+  const logId = item?.id ?? item?.url ?? ''
 
   useEffect(() => {
     if (contentIdInt == null) return
@@ -765,7 +768,7 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
   }, [contentIdInt, reportEvent])
 
   useEffect(() => {
-    if (item.type !== 'video' || !url) return
+    if (item?.type !== 'video' || !url) return
     const el = videoRef.current
     if (!el) return
     const tryPlay = () => {
@@ -774,7 +777,15 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
     tryPlay()
     el.addEventListener('canplay', tryPlay)
     return () => el.removeEventListener('canplay', tryPlay)
-  }, [item.type, url])
+  }, [item?.type, url])
+
+  if (!item) {
+    return (
+      <div className="zone-placeholder">
+        <span>대기 중</span>
+      </div>
+    )
+  }
 
   if (item.type === 'video') {
     if (!url) {
