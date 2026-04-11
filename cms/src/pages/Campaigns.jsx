@@ -1,5 +1,10 @@
 import { useEffect, useState, Fragment } from 'react'
 import { api } from '../lib/api'
+import {
+  formatKstDate,
+  utcIsoToDatetimeLocalKst,
+  datetimeLocalKstToUtcIso,
+} from '../lib/datetimeKst'
 
 const TABS = [
   { id: 'list', label: '목록' },
@@ -68,8 +73,8 @@ export default function Campaigns() {
         method: 'POST',
         body: JSON.stringify({
           name: name.trim(),
-          start_at: new Date(start_at).toISOString(),
-          end_at: new Date(end_at).toISOString(),
+          start_at: datetimeLocalKstToUtcIso(start_at),
+          end_at: datetimeLocalKstToUtcIso(end_at),
           priority: parseInt(priority, 10) || 0,
           content_ids: Array.isArray(content_ids) ? content_ids : [],
         }),
@@ -106,11 +111,10 @@ export default function Campaigns() {
     setEditLoading(true)
     api(`/campaigns/${c.id}`)
       .then((detail) => {
-        const toLocal = (d) => (d ? new Date(d).toISOString().slice(0, 16) : '')
         setEditForm({
           name: detail.name || '',
-          start_at: toLocal(detail.start_at),
-          end_at: toLocal(detail.end_at),
+          start_at: utcIsoToDatetimeLocalKst(detail.start_at),
+          end_at: utcIsoToDatetimeLocalKst(detail.end_at),
           priority: detail.priority ?? 0,
           content_ids: Array.isArray(detail.content_ids) ? detail.content_ids : [],
         })
@@ -134,8 +138,8 @@ export default function Campaigns() {
         method: 'PATCH',
         body: JSON.stringify({
           name: name.trim(),
-          start_at: new Date(start_at).toISOString(),
-          end_at: new Date(end_at).toISOString(),
+          start_at: datetimeLocalKstToUtcIso(start_at),
+          end_at: datetimeLocalKstToUtcIso(end_at),
           priority: parseInt(priority, 10) || 0,
           content_ids: Array.isArray(content_ids) ? content_ids : [],
         }),
@@ -162,6 +166,9 @@ export default function Campaigns() {
   return (
     <div className="page">
       <h1>캠페인</h1>
+      <p className="small" style={{ color: '#666', marginBottom: '1rem' }}>
+        시작·종료 일시는 한국 표준시(KST, Asia/Seoul) 기준입니다.
+      </p>
 
       <div className="tabs">
         <div className="tab-list" role="tablist">
@@ -250,8 +257,8 @@ export default function Campaigns() {
                         ) : (
                           <>
                             <td>{c.name}</td>
-                            <td>{new Date(c.start_at).toLocaleDateString('ko-KR')}</td>
-                            <td>{new Date(c.end_at).toLocaleDateString('ko-KR')}</td>
+                            <td>{formatKstDate(c.start_at)}</td>
+                            <td>{formatKstDate(c.end_at)}</td>
                             <td>{c.priority}</td>
                             <td>
                               <button type="button" className="btn btn-sm" onClick={() => startEdit(c)} disabled={editLoading}>

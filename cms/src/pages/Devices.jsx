@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, API_BASE, getUploadsOrigin } from '../lib/api'
+import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
 
 export default function Devices() {
@@ -278,6 +279,9 @@ export default function Devices() {
   return (
     <div className="page">
       <h1>디바이스</h1>
+      <p className="small" style={{ color: '#666', marginBottom: '1rem' }}>
+        마지막 접속 시각은 한국 표준시(KST)로 표시됩니다.
+      </p>
 
       <div className="devices-top-row">
         {user?.role === 'admin' && (
@@ -410,7 +414,7 @@ export default function Devices() {
                           </select>
                         </td>
                         <td><span className={`status status-${d.status}`}>{d.status}</span></td>
-                        <td>{d.last_seen ? new Date(d.last_seen).toLocaleString('ko-KR') : '-'}</td>
+                        <td>{d.last_seen ? formatKstDateTime(d.last_seen) : '-'}</td>
                         <td>
                           <button type="button" className="btn btn-sm btn-primary" onClick={saveEdit}>
                             저장
@@ -428,7 +432,7 @@ export default function Devices() {
                         <td>{d.location}</td>
                         <td>{getGroupName(d.group_id)}</td>
                         <td><span className={`status status-${d.status}`}>{d.status}</span></td>
-                        <td>{d.last_seen ? new Date(d.last_seen).toLocaleString('ko-KR') : '-'}</td>
+                        <td>{d.last_seen ? formatKstDateTime(d.last_seen) : '-'}</td>
                         <td>
                           <button type="button" className="btn btn-sm" onClick={() => openLiveScreen(d)}>
                             실시간 화면

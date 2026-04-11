@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from datetime import datetime
 from typing import Optional
 from app.database import get_db
+from app.datetime_kst import to_kst_iso
 from app.models import Campaign, CampaignContent, User
 from app.deps import get_current_user
 from sqlalchemy.orm import selectinload
@@ -35,6 +36,10 @@ class CampaignItem(BaseModel):
     end_at: datetime
     priority: int
     created_at: datetime
+
+    @field_serializer("start_at", "end_at", "created_at")
+    def _serialize_kst(self, v: datetime) -> str:
+        return to_kst_iso(v) or ""
 
     class Config:
         from_attributes = True

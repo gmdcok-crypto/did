@@ -13,6 +13,7 @@ from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
+from app.datetime_kst import to_kst_iso
 from app.sse_broadcast import (
     subscribe,
     unsubscribe,
@@ -159,7 +160,7 @@ async def list_devices(
             location=d.location,
             group_id=d.group_id,
             status=_effective_device_status(d),
-            last_seen=d.last_seen.isoformat() if d.last_seen else None,
+            last_seen=to_kst_iso(d.last_seen),
         )
         for d in devices
     ]
@@ -309,7 +310,7 @@ async def device_live_screen_status(
         ticket=device.live_screen_ticket,
         last_ticket=device.live_screen_last_ticket,
         image_url=image_url,
-        captured_at=device.live_screen_at.isoformat() if device.live_screen_at else None,
+        captured_at=to_kst_iso(device.live_screen_at),
     )
 
 
@@ -348,7 +349,7 @@ async def update_device(
         location=device.location,
         group_id=device.group_id,
         status=_effective_device_status(device),
-        last_seen=device.last_seen.isoformat() if device.last_seen else None,
+        last_seen=to_kst_iso(device.last_seen),
     )
 
 
