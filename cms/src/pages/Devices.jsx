@@ -258,9 +258,7 @@ export default function Devices() {
     const wsUrl = getLiveViewWsUrl(pk, ticket, token)
     const ws = new WebSocket(wsUrl)
     ws.binaryType = 'arraybuffer'
-    ws.onopen = () => {
-      setLiveModal((m) => ({ ...m, loading: false }))
-    }
+    // onopen 에서 loading 을 끄면 첫 프레임 전에 본문이 비어 "닫기"만 보임 → 첫 JPEG 수신 시에만 로딩 해제
     ws.onmessage = (ev) => {
       const blob = new Blob([ev.data], { type: 'image/jpeg' })
       const url = URL.createObjectURL(blob)
@@ -276,12 +274,22 @@ export default function Devices() {
         error: m.error || '실시간 스트림 연결에 실패했습니다. 플레이어가 켜져 있는지 확인하세요.',
       }))
     }
-    return () => {
-      ws.close()
+    ws.onclose = () => {
       setLiveModal((m) => {
-        if (m.prevBlobUrl) URL.revokeObjectURL(m.prevBlobUrl)
-        return { ...m, prevBlobUrl: null, imageSrc: null }
+        if (!m.open) return m
+        if (m.imageSrc) return m
+        return {
+          ...m,
+          loading: false,
+          error: m.error || '스트림이 끊겼거나 화면을 받지 못했습니다.',
+        }
       })
+    }
+    // effect 재실행·Strict Mode 시 이미지를 지우지 않음(닫기만 보이는 현상 방지). 연결만 끊고 blob 은 closeLiveModal 에서 정리
+    return () => {
+      try {
+        ws.close()
+      } catch (_) {}
     }
   }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk])
 
