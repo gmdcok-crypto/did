@@ -256,26 +256,35 @@ export default function Devices() {
         lastSt = st || null
         if (livePollAbortRef.current !== myAbort) return
         const last = String(st?.last_ticket ?? '').trim()
-        // 서버가 image_url 을 빠뜨리는 경우 대비: 업로드 완료(pending=false)+티켓 일치 시 고정 경로 시도
-        const fallbackPath = `/uploads/screenshots/${d.device_id}.jpg`
-        const path =
-          st?.image_url ||
-          (last && last === ticket && st?.pending === false ? fallbackPath : null)
-        if (last && last === ticket && path) {
-          const p = String(path).startsWith('/') ? String(path) : `/${path}`
-          const src = `${getUploadsOrigin()}${p}?t=${Date.now()}`
-          setLiveModal((m) => ({ ...m, loading: false, imageSrc: src }))
-          return
+        if (last && last === ticket) {
+          // DB에 넣은 JPEG(base64) — Railway 다중 인스턴스에서도 동작
+          if (st?.image_base64) {
+            setLiveModal((m) => ({
+              ...m,
+              loading: false,
+              imageSrc: `data:image/jpeg;base64,${st.image_base64}`,
+            }))
+            return
+          }
+          const fallbackPath = `/uploads/screenshots/${d.device_id}.jpg`
+          const path =
+            st?.image_url || (st?.pending === false ? fallbackPath : null)
+          if (path) {
+            const p = String(path).startsWith('/') ? String(path) : `/${path}`
+            const src = `${getUploadsOrigin()}${p}?t=${Date.now()}`
+            setLiveModal((m) => ({ ...m, loading: false, imageSrc: src }))
+            return
+          }
         }
       }
       const hint =
         lastSt != null
-          ? ` (서버: pending=${String(lastSt.pending)}, image_url=${lastSt.image_url ? '있음' : '없음'}, 티켓일치=${String(lastSt.last_ticket ?? '').trim() === ticket ? '예' : '아니오'})`
+          ? ` (서버: pending=${String(lastSt.pending)}, base64=${lastSt.image_base64 ? '있음' : '없음'}, url=${lastSt.image_url ? '있음' : '없음'}, 티켓일치=${String(lastSt.last_ticket ?? '').trim() === ticket ? '예' : '아니오'})`
           : ''
       setLiveModal((m) => ({
         ...m,
         loading: false,
-        error: `시간 내에 화면을 받지 못했습니다. 플레이어 탭을 켠 뒤 다시 시도하세요.${hint} Railway를 2개 이상 인스턴스로 띄운 경우 업로드 파일이 다른 서버에만 있어 이미지가 안 나올 수 있습니다.`,
+        error: `시간 내에 화면을 받지 못했습니다. 플레이어 탭을 켠 뒤 다시 시도하세요.${hint}`,
       }))
     } catch (e) {
       if (livePollAbortRef.current !== myAbort) return

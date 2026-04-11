@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +9,6 @@ from urllib.parse import urlparse
 import asyncio
 from app.database import get_db
 from app.models import Device, Schedule, Campaign, CampaignContent, Content
-from app.config import get_settings
 from app.sse_broadcast import subscribe_schedule, unsubscribe_schedule, broadcast_device_list_updated
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -399,22 +396,10 @@ async def live_screen_upload(
     if len(raw) < 32:
         raise HTTPException(status_code=400, detail="빈 이미지입니다.")
 
-    settings = get_settings()
-    base = Path(settings.upload_dir)
-    shot_dir = base / "screenshots"
-    shot_dir.mkdir(parents=True, exist_ok=True)
+    # JPEG는 DB에만 저장 — Railway 다중 인스턴스에서 로컬 디스크 경로가 어긋나 이미지가 안 보이는 문제 방지
     rel = f"screenshots/{device.device_id}.jpg"
-    dest = base / rel
-    if device.live_screen_path and device.live_screen_path != rel:
-        try:
-            old = base / device.live_screen_path
-            if old.is_file():
-                old.unlink()
-        except OSError:
-            pass
-    dest.write_bytes(raw)
-
     device.live_screen_path = rel
+    device.live_screen_jpeg = raw
     device.live_screen_pending = False
     device.live_screen_last_ticket = t
     device.live_screen_at = datetime.utcnow()

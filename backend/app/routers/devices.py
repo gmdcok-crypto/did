@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
+from sqlalchemy.orm import undefer
 from pydantic import BaseModel
 from typing import Optional
 import uuid
 
 from datetime import datetime, timedelta
+import base64
 
 from app.database import get_db
 from app.models import Device, DeviceGroup, User, PlaybackEvent
@@ -281,6 +283,9 @@ class LiveScreenStatusResponse(BaseModel):
     ticket: Optional[str] = None
     last_ticket: Optional[str] = None
     image_url: Optional[str] = None
+    """레거시(/uploads 경로). 다중 인스턴스에서는 비어 있을 수 있음."""
+    image_base64: Optional[str] = None
+    """DB에 저장된 JPEG — 어떤 앱 서버에서 조회해도 동일."""
     captured_at: Optional[str] = None
 
 
@@ -298,6 +303,7 @@ async def request_device_live_screen(
     ticket = str(uuid.uuid4())
     device.live_screen_ticket = ticket
     device.live_screen_pending = True
+    device.live_screen_jpeg = None
     await db.commit()
     broadcast_live_screen_request(device.device_id)
     return LiveScreenRequestResponse(ticket=ticket)
@@ -310,16 +316,28 @@ async def device_live_screen_status(
     user: User = Depends(get_current_user),
 ):
     """CMS: 캡처 완료 여부·이미지 URL 조회."""
-    result = await db.execute(select(Device).where(Device.id == id))
+    result = await db.execute(
+        select(Device)
+        .options(undefer(Device.live_screen_jpeg))
+        .where(Device.id == id)
+    )
     device = result.scalar_one_or_none()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     image_url = f"/uploads/{device.live_screen_path}" if device.live_screen_path else None
+    jpeg = device.live_screen_jpeg
+    img_b64 = None
+    if jpeg and len(jpeg) > 0:
+        try:
+            img_b64 = base64.b64encode(bytes(jpeg)).decode("ascii")
+        except Exception:
+            img_b64 = None
     return LiveScreenStatusResponse(
         pending=device.live_screen_pending,
         ticket=device.live_screen_ticket,
         last_ticket=device.live_screen_last_ticket,
         image_url=image_url,
+        image_base64=img_b64,
         captured_at=to_kst_iso(device.live_screen_at),
     )
 

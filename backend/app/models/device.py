@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Boolean
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Boolean, LargeBinary
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional
@@ -32,7 +32,9 @@ class Device(Base):
     live_screen_pending: Mapped[bool] = mapped_column(Boolean, default=False)
     live_screen_ticket: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     live_screen_last_ticket: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    live_screen_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # upload_dir 기준 상대경로
+    live_screen_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # upload_dir 기준 상대경로(레거시)
+    # Railway 다중 인스턴스에서도 동일하게 보이도록 캡처 바이트를 DB에 보관(목록 조회 시 지연 로드)
+    live_screen_jpeg: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
     live_screen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     group: Mapped[Optional["DeviceGroup"]] = relationship("DeviceGroup", back_populates="devices")
