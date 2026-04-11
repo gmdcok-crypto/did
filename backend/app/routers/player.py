@@ -95,10 +95,14 @@ async def get_schedule(
         raise HTTPException(status_code=404, detail="Device not found")
 
     # Update last_seen and status so CMS shows device as online
+    prev_status = (device.status or "").strip().lower()
     device.status = "online"
     device.last_seen = datetime.utcnow()
     await db.flush()
-    broadcast_device_list_updated()
+    # 스케줄 폴링마다 브로드캐스트하면 CMS 디바이스 탭 SSE가 매번 목록을 다시 불러 깜박임 →
+    # 오프라인/에러에서 온라인으로 바뀔 때 등 의미 있는 변화에만 알림
+    if prev_status != "online":
+        broadcast_device_list_updated()
 
     # Find active schedule for this device's group
     result = await db.execute(
