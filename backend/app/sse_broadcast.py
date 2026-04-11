@@ -24,6 +24,15 @@ def broadcast_device_list_updated() -> None:
             pass
 
 
+def broadcast_cms_dashboard_updated() -> None:
+    """캠페인·미디어·스케줄 등 대시보드 KPI가 바뀔 때 CMS가 전체 통계를 다시 불러오도록."""
+    for q in _queues:
+        try:
+            q.put_nowait("cms_dashboard_updated")
+        except asyncio.QueueFull:
+            pass
+
+
 _schedule_queues: List[asyncio.Queue] = []
 
 

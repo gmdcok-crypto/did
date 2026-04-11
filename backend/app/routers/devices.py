@@ -21,6 +21,7 @@ from app.sse_broadcast import (
     broadcast_device_list_updated,
     broadcast_schedule_updated,
     broadcast_live_screen_request,
+    broadcast_cms_dashboard_updated,
 )
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -267,6 +268,8 @@ async def delete_group(
         device.group_id = None
     await db.delete(group)
     await db.flush()
+    broadcast_device_list_updated()
+    broadcast_cms_dashboard_updated()
 
 
 class LiveScreenRequestResponse(BaseModel):

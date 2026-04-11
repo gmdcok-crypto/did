@@ -1,5 +1,6 @@
-import { useEffect, useState, Fragment } from 'react'
+import { useEffect, useState, Fragment, useCallback } from 'react'
 import { api } from '../lib/api'
+import { subscribeCmsDeviceEvents, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 
 const TABS = [
   { id: 'list', label: '목록' },
@@ -77,7 +78,7 @@ export default function Schedules() {
       .catch(() => setList([]))
   }
 
-  useEffect(() => {
+  const reloadAll = useCallback(() => {
     setLoading(true)
     Promise.all([
       api('/schedules').catch(() => []),
@@ -93,6 +94,16 @@ export default function Schedules() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    reloadAll()
+  }, [reloadAll])
+
+  useEffect(() => {
+    return subscribeCmsDeviceEvents((msg) => {
+      if (msg === CMS_SSE_DASHBOARD) reloadAll()
+    })
+  }, [reloadAll])
 
   const handleAddSchedule = async (e) => {
     e.preventDefault()

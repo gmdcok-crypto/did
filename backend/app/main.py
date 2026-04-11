@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.routers import auth, devices, player, events, contents, campaigns, schedules, settings as settings_router
 from app.models import User
 from app.auth import get_password_hash
+from app.stale_device_broadcaster import run_stale_device_broadcaster
 
 
 class RailwayHealthMiddleware:
@@ -166,6 +167,7 @@ async def lifespan(app: FastAPI):
         s = get_settings()
         os.makedirs(s.upload_dir, exist_ok=True)
         asyncio.create_task(_background_startup_db())
+        asyncio.create_task(run_stale_device_broadcaster())
     except Exception as e:
         print(f"lifespan prep failed (server still binds): {e}")
     yield

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, API_BASE } from '../lib/api'
+import { api } from '../lib/api'
+import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -13,52 +14,41 @@ export default function Dashboard() {
   const [recentDevices, setRecentDevices] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const refreshDeviceStats = useCallback(async () => {
-    const devices = await api('/devices').catch(() => [])
-    const devList = Array.isArray(devices) ? devices : []
-    setStats((s) => ({
-      ...s,
-      devices: devList.length,
-      onlineDevices: devList.filter((d) => d.status === 'online').length,
-    }))
-    setRecentDevices(devList.slice(-5).reverse())
-  }, [])
-
-  useEffect(() => {
-    Promise.all([
+  const refreshAll = useCallback(async () => {
+    const [campaigns, devices, contents, schedules] = await Promise.all([
       api('/campaigns').catch(() => []),
       api('/devices').catch(() => []),
       api('/contents').catch(() => []),
       api('/schedules').catch(() => []),
-    ]).then(([campaigns, devices, contents, schedules]) => {
-      const devList = Array.isArray(devices) ? devices : []
-      setStats({
-        campaigns: Array.isArray(campaigns) ? campaigns.length : 0,
-        devices: devList.length,
-        onlineDevices: devList.filter((d) => d.status === 'online').length,
-        contents: Array.isArray(contents) ? contents.length : 0,
-        schedules: Array.isArray(schedules) ? schedules.length : 0,
-      })
-      setRecentDevices(devList.slice(-5).reverse())
-      setLoading(false)
+    ])
+    const devList = Array.isArray(devices) ? devices : []
+    setStats({
+      campaigns: Array.isArray(campaigns) ? campaigns.length : 0,
+      devices: devList.length,
+      onlineDevices: devList.filter((d) => d.status === 'online').length,
+      contents: Array.isArray(contents) ? contents.length : 0,
+      schedules: Array.isArray(schedules) ? schedules.length : 0,
     })
+    setRecentDevices(devList.slice(-5).reverse())
   }, [])
 
-  // 디바이스 탭과 동일: 기기 온라인 등 변경 시 대시보드 숫자도 갱신 (처음만 보고 오프라인 고정 방지)
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/devices/events`)
-    es.onmessage = () => refreshDeviceStats()
-    es.onerror = () => es.close()
-    return () => es.close()
-  }, [refreshDeviceStats])
+    refreshAll().finally(() => setLoading(false))
+  }, [refreshAll])
+
+  useEffect(() => {
+    return subscribeCmsDeviceEvents((msg) => {
+      if (msg === CMS_SSE_DEVICE_LIST || msg === CMS_SSE_DASHBOARD) refreshAll()
+    })
+  }, [refreshAll])
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refreshDeviceStats()
+      if (document.visibilityState === 'visible') refreshAll()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [refreshDeviceStats])
+  }, [refreshAll])
 
   if (loading) return <div className="loading">로딩 중...</div>
 

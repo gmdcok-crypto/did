@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
-import { api, API_BASE, getUploadsOrigin } from '../lib/api'
+import { api, getUploadsOrigin } from '../lib/api'
+import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
 
@@ -104,12 +105,11 @@ export default function Devices() {
     }
   }, [groups, selectedGroupId])
 
-  // SSE: 디바이스 등록/수정 시 서버가 보내는 신호 수신 → 목록 갱신
+  // SSE: 디바이스 등록·오프라인·대시보드 연동 이벤트 → 목록 갱신 (끊기면 자동 재연결)
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/devices/events`)
-    es.onmessage = () => load()
-    es.onerror = () => es.close()
-    return () => es.close()
+    return subscribeCmsDeviceEvents((msg) => {
+      if (msg === CMS_SSE_DEVICE_LIST || msg === CMS_SSE_DASHBOARD) load()
+    })
   }, [])
 
   const getGroupName = (groupId) => {

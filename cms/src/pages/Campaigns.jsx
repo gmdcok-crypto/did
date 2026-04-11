@@ -1,5 +1,6 @@
-import { useEffect, useState, Fragment } from 'react'
+import { useEffect, useState, Fragment, useCallback } from 'react'
 import { api } from '../lib/api'
+import { subscribeCmsDeviceEvents, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 import {
   formatKstDate,
   utcIsoToDatetimeLocalKst,
@@ -46,7 +47,7 @@ export default function Campaigns() {
       .catch(() => setContents([]))
   }
 
-  useEffect(() => {
+  const reloadLists = useCallback(() => {
     setLoading(true)
     Promise.all([api('/campaigns').catch(() => []), api('/contents').catch(() => [])])
       .then(([campaigns, contentsList]) => {
@@ -55,6 +56,16 @@ export default function Campaigns() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    reloadLists()
+  }, [reloadLists])
+
+  useEffect(() => {
+    return subscribeCmsDeviceEvents((msg) => {
+      if (msg === CMS_SSE_DASHBOARD) reloadLists()
+    })
+  }, [reloadLists])
 
   const handleAddCampaign = async (e) => {
     e.preventDefault()

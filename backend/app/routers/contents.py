@@ -15,6 +15,7 @@ from app.storage_media import (
     repoint_legacy_r2_public_url,
 )
 from app.content_usage import content_is_in_use
+from app.sse_broadcast import broadcast_cms_dashboard_updated, broadcast_schedule_updated
 
 router = APIRouter(prefix="/contents", tags=["contents"])
 
@@ -89,6 +90,8 @@ async def repoint_r2_public_urls(
         c.url = new_u
         items.append(RepointR2UrlItem(id=c.id, old_url=old, new_url=new_u))
     await db.commit()
+    broadcast_cms_dashboard_updated()
+    broadcast_schedule_updated()
     return RepointR2UrlsResponse(updated=len(items), items=items)
 
 
@@ -148,6 +151,7 @@ async def create_content(
     db.add(c)
     await db.flush()
     await db.refresh(c)
+    broadcast_cms_dashboard_updated()
     return c
 
 
@@ -172,6 +176,8 @@ async def update_content(
         c.name = data.name
     await db.flush()
     await db.refresh(c)
+    broadcast_cms_dashboard_updated()
+    broadcast_schedule_updated()
     return c
 
 
@@ -198,3 +204,5 @@ async def delete_content(
     await db.execute(delete(CampaignContent).where(CampaignContent.content_id == id))
     await db.delete(c)
     await db.flush()
+    broadcast_cms_dashboard_updated()
+    broadcast_schedule_updated()

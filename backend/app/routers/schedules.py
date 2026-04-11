@@ -6,7 +6,7 @@ from typing import Optional
 from app.database import get_db
 from app.models import Schedule, Campaign, DeviceGroup, User
 from app.deps import get_current_user
-from app.sse_broadcast import broadcast_schedule_updated
+from app.sse_broadcast import broadcast_schedule_updated, broadcast_cms_dashboard_updated
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -68,6 +68,7 @@ async def create_schedule(
     await db.refresh(s)
     await db.commit()
     broadcast_schedule_updated()
+    broadcast_cms_dashboard_updated()
     return s
 
 
@@ -98,6 +99,7 @@ async def update_schedule(
     await db.refresh(s)
     await db.commit()
     broadcast_schedule_updated()
+    broadcast_cms_dashboard_updated()
     return s
 
 
@@ -115,3 +117,4 @@ async def delete_schedule(
     await db.flush()
     await db.commit()
     broadcast_schedule_updated()
+    broadcast_cms_dashboard_updated()

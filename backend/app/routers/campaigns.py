@@ -8,6 +8,7 @@ from app.database import get_db
 from app.datetime_kst import to_kst_iso
 from app.models import Campaign, CampaignContent, User
 from app.deps import get_current_user
+from app.sse_broadcast import broadcast_cms_dashboard_updated, broadcast_schedule_updated
 from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -76,6 +77,8 @@ async def create_campaign(
         cc = CampaignContent(campaign_id=c.id, content_id=cid, order=i)
         db.add(cc)
     await db.refresh(c)
+    broadcast_cms_dashboard_updated()
+    broadcast_schedule_updated()
     return c
 
 
@@ -131,6 +134,8 @@ async def update_campaign(
             db.add(cc)
     await db.flush()
     await db.refresh(c)
+    broadcast_cms_dashboard_updated()
+    broadcast_schedule_updated()
     return c
 
 
@@ -147,3 +152,5 @@ async def delete_campaign(
     await db.execute(delete(CampaignContent).where(CampaignContent.campaign_id == campaign_id))
     await db.delete(c)
     await db.flush()
+    broadcast_cms_dashboard_updated()
+    broadcast_schedule_updated()

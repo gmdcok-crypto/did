@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { api, uploadFile } from '../lib/api'
+import { subscribeCmsDeviceEvents, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 
 export default function Contents() {
   const [list, setList] = useState([])
@@ -10,17 +11,23 @@ export default function Contents() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true)
     api('/contents')
       .then((data) => setList(Array.isArray(data) ? data : []))
       .catch(() => setList([]))
       .finally(() => setLoading(false))
-  }
+  }, [])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
+
+  useEffect(() => {
+    return subscribeCmsDeviceEvents((msg) => {
+      if (msg === CMS_SSE_DASHBOARD) load()
+    })
+  }, [load])
 
   const startEdit = (c) => {
     setEditingId(c.id)
