@@ -274,6 +274,12 @@ body {
   font-family: system-ui, sans-serif;
 }
 
+.player-debug-hud-zones {
+  margin-top: 0.25rem;
+  word-break: break-all;
+  opacity: 0.95;
+}
+
 /* Player settings */
 /* 전체화면 (좌측 상단 — 우측 ⚙ 설정과 겹치지 않음) */
 .player-fullscreen-btn {

@@ -85,6 +85,22 @@ function recoverMediaAfterPageShow() {
   })
 }
 
+function summarizeScheduleZonesForDebug(schedule) {
+  if (!schedule?.zones?.length) return '(zones 없음)'
+  const lines = schedule.zones.slice(0, 3).map((z, i) => {
+    const items = z.items || []
+    const n = items.length
+    if (n === 0) return `z${i + 1}: items 0`
+    const it = items[0]
+    const ty = it?.type ?? '?'
+    if (ty === 'placeholder') return `z${i + 1}: placeholder만 (${n}슬롯)`
+    const u = String(it?.url || '')
+    const short = u.length > 64 ? `${u.slice(0, 64)}…` : u || '(url 없음)'
+    return `z${i + 1}: ${n}개 · 첫=${ty} · ${short}`
+  })
+  return lines.join(' | ')
+}
+
 function DebugHud({ deviceId, schedule, error, online }) {
   if (!isDebugUrl()) return null
   const apiHint = typeof window !== 'undefined' ? `${window.location.origin}/api` : ''
@@ -94,6 +110,9 @@ function DebugHud({ deviceId, schedule, error, online }) {
       <div className="player-debug-hud-title">debug=1</div>
       <div>device_id: {deviceId ? `${deviceId.slice(0, 12)}…` : '(없음)'}</div>
       <div>schedule: {schedule ? `로드됨 · zones ${zc}` : '(없음)'}</div>
+      {schedule && (
+        <div className="player-debug-hud-mono player-debug-hud-zones">{summarizeScheduleZonesForDebug(schedule)}</div>
+      )}
       <div>error: {error || '—'}</div>
       <div>online: {String(online)}</div>
       <div className="player-debug-hud-mono">API: {apiHint}</div>
