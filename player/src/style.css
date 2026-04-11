@@ -280,6 +280,51 @@ body {
   opacity: 0.95;
 }
 
+.player-debug-hud-warn {
+  color: #fca5a5;
+  font-weight: 600;
+  margin: 0.2rem 0;
+}
+
+/* ?show_device=1 — F12 없이 화면 하단에 UUID·일치 여부 */
+.player-device-id-strip {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #e4e4e7;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 3px solid #64748b;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  word-break: break-all;
+  pointer-events: none;
+}
+
+.player-device-id-strip.match {
+  border-top-color: #22c55e;
+}
+
+.player-device-id-strip.mismatch {
+  border-top-color: #ef4444;
+}
+
+.player-device-id-strip-verdict {
+  margin-top: 0.2rem;
+  font-weight: 700;
+}
+
+.player-device-id-strip.match .player-device-id-strip-verdict {
+  color: #86efac;
+}
+
+.player-device-id-strip.mismatch .player-device-id-strip-verdict {
+  color: #fca5a5;
+}
+
 /* Player settings */
 /* 전체화면 (좌측 상단 — 우측 ⚙ 설정과 겹치지 않음) */
 .player-fullscreen-btn {

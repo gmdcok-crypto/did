@@ -63,6 +63,39 @@ function isDebugUrl() {
   return new URLSearchParams(window.location.search).get('debug') === '1'
 }
 
+/** 하단에 기기 UUID·CMS와의 일치 여부를 직접 표시 (?show_device=1) */
+function showDeviceIdStripUrl() {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('show_device') === '1'
+}
+
+function deviceIdMatchInfo(deviceId, schedule) {
+  const local = String(deviceId || '').trim()
+  const server = schedule?.device_id != null ? String(schedule.device_id).trim() : ''
+  if (!local) return { local, server, matchLabel: 'localStorage 없음', ok: null }
+  if (!server) return { local, server, matchLabel: '스케줄 응답 대기 중', ok: null }
+  if (local === server) return { local, server, matchLabel: '일치 (실시간 화면·CMS device_id 동일)', ok: true }
+  return { local, server, matchLabel: '불일치 — CMS 목록 device_id 와 다를 수 있음', ok: false }
+}
+
+function DeviceIdStrip({ deviceId, schedule }) {
+  if (!showDeviceIdStripUrl()) return null
+  const m = deviceIdMatchInfo(deviceId, schedule)
+  const cls =
+    m.ok === true ? 'player-device-id-strip match' : m.ok === false ? 'player-device-id-strip mismatch' : 'player-device-id-strip'
+  return (
+    <div className={cls} role="status">
+      <div>
+        <strong>localStorage</strong> did_device_id: {m.local || '(없음)'}
+      </div>
+      <div>
+        <strong>서버</strong> schedule.device_id: {m.server || '(아직 없음)'}
+      </div>
+      <div className="player-device-id-strip-verdict">→ {m.matchLabel}</div>
+    </div>
+  )
+}
+
 /** 탭 복귀 시 일부 모바일 브라우저에서 비디오가 멈춘 채 검은 화면만 남는 현상 완화 */
 function nudgeVideoPlayback() {
   if (typeof document === 'undefined') return
@@ -106,10 +139,13 @@ function DebugHud({ deviceId, schedule, error, online }) {
   if (!isDebugUrl()) return null
   const apiHint = typeof window !== 'undefined' ? `${window.location.origin}/api` : ''
   const zc = schedule?.zones?.length ?? 0
+  const mid = deviceIdMatchInfo(deviceId, schedule)
   return (
     <div className="player-debug-hud" aria-hidden>
       <div className="player-debug-hud-title">debug=1</div>
-      <div>device_id: {deviceId ? `${deviceId.slice(0, 12)}…` : '(없음)'}</div>
+      <div className="player-debug-hud-mono">localStorage: {mid.local || '(없음)'}</div>
+      <div className="player-debug-hud-mono">서버 schedule.device_id: {mid.server || '(없음)'}</div>
+      <div className={mid.ok === false ? 'player-debug-hud-warn' : undefined}>→ {mid.matchLabel}</div>
       <div>schedule: {schedule ? `로드됨 · zones ${zc}` : '(없음)'}</div>
       {schedule && (
         <div className="player-debug-hud-mono player-debug-hud-zones">{summarizeScheduleZonesForDebug(schedule)}</div>
@@ -117,7 +153,9 @@ function DebugHud({ deviceId, schedule, error, online }) {
       <div>error: {error || '—'}</div>
       <div>online: {String(online)}</div>
       <div className="player-debug-hud-mono">API: {apiHint}</div>
-      <div className="player-debug-hud-hint">미디어 실패는 F12 콘솔·Network 또는 여기서 스케줄/존 확인 · 복구: URL에 ?reset=1</div>
+      <div className="player-debug-hud-hint">
+        UUID 하단 고정: URL에 ?show_device=1 · 미디어 실패는 F12 또는 여기서 확인 · 복구: ?reset=1
+      </div>
     </div>
   )
 }
@@ -537,6 +575,7 @@ export default function App() {
         </p>
       </div>
       <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
+      <DeviceIdStrip deviceId={deviceId} schedule={schedule} />
       </>
     )
   }
@@ -650,6 +689,7 @@ export default function App() {
       </div>
     </div>
     <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
+    <DeviceIdStrip deviceId={deviceId} schedule={schedule} />
     </>
   )
 }

@@ -280,6 +280,7 @@ class LiveScreenRequestResponse(BaseModel):
 
 class LiveScreenStatusResponse(BaseModel):
     pending: bool
+    device_id: Optional[str] = None
     ticket: Optional[str] = None
     last_ticket: Optional[str] = None
     image_url: Optional[str] = None
@@ -339,6 +340,7 @@ async def device_live_screen_status(
             img_b64 = None
     return LiveScreenStatusResponse(
         pending=device.live_screen_pending,
+        device_id=device.device_id,
         ticket=device.live_screen_ticket,
         last_ticket=device.live_screen_last_ticket,
         image_url=image_url,

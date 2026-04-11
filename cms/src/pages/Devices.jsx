@@ -23,6 +23,8 @@ export default function Devices() {
     loading: false,
     error: null,
     imageSrc: null,
+    /** 실시간 화면 요청 시 목록의 device_id(UUID) — 플레이어 localStorage 와 비교 안내용 */
+    liveDeviceId: '',
   })
   const livePollAbortRef = useRef(0)
 
@@ -225,6 +227,7 @@ export default function Devices() {
       loading: false,
       error: null,
       imageSrc: null,
+      liveDeviceId: '',
     })
   }
 
@@ -236,6 +239,7 @@ export default function Devices() {
       loading: true,
       error: null,
       imageSrc: null,
+      liveDeviceId: String(d.device_id ?? '').trim(),
     })
     try {
       const req = await api(`/devices/${d.id}/live-screen/request`, { method: 'POST' })
@@ -277,10 +281,14 @@ export default function Devices() {
           }
         }
       }
+      const cmsDid = String(d.device_id ?? '').trim()
+      const stDid = lastSt != null ? String(lastSt.device_id ?? '').trim() : ''
+      const listServerMatch =
+        cmsDid && stDid ? (cmsDid === stDid ? '예' : '아니오') : '—'
       const hint =
         lastSt != null
-          ? ` (서버: pending=${String(lastSt.pending)}, base64=${lastSt.image_base64 ? '있음' : '없음'}, url=${lastSt.image_url ? '있음' : '없음'}, 티켓일치=${String(lastSt.last_ticket ?? '').trim() === ticket ? '예' : '아니오'})`
-          : ''
+          ? ` (요청 device_id=${cmsDid || '—'}, status device_id=${stDid || '—'}, 목록·서버 UUID일치=${listServerMatch}; pending=${String(lastSt.pending)}, base64=${lastSt.image_base64 ? '있음' : '없음'}, url=${lastSt.image_url ? '있음' : '없음'}, 티켓일치=${String(lastSt.last_ticket ?? '').trim() === ticket ? '예' : '아니오'} — 플레이어 F12 → Application → Local Storage → did_device_id 가 요청 device_id 와 같아야 업로드됩니다)`
+          : ` (요청 device_id=${cmsDid || '—'} — 플레이어 localStorage did_device_id 와 동일한지 확인)`
       setLiveModal((m) => ({
         ...m,
         loading: false,
@@ -288,7 +296,11 @@ export default function Devices() {
       }))
     } catch (e) {
       if (livePollAbortRef.current !== myAbort) return
-      setLiveModal((m) => ({ ...m, loading: false, error: e?.message || '요청 실패' }))
+      setLiveModal((m) => ({
+        ...m,
+        loading: false,
+        error: `${e?.message || '요청 실패'} (요청 device_id=${String(d.device_id ?? '').trim() || '—'})`,
+      }))
     }
   }
 

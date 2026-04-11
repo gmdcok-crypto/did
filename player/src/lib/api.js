@@ -207,7 +207,33 @@ export async function fetchSchedule(deviceId, options = {}) {
     const hint = text ? ` — ${text.slice(0, 200)}` : ''
     throw new Error(`스케줄 요청 실패 HTTP ${res.status}${hint}`)
   }
-  return res.json()
+  const data = await res.json()
+  logScheduleDeviceIdConsistency(deviceId, data)
+  return data
+}
+
+/** 스케줄 응답의 device_id 와 요청한 UUID 비교 — 실시간 화면/CMS 연동 점검용 */
+let _scheduleDeviceIdHintLogged = false
+export function logScheduleDeviceIdConsistency(requestedDeviceId, schedule) {
+  if (!schedule || typeof schedule !== 'object') return
+  const sid = schedule.device_id
+  if (sid == null || String(sid).trim() === '') return
+  const req = String(requestedDeviceId || '').trim()
+  const srv = String(sid).trim()
+  if (req !== srv) {
+    console.warn('[DID player] device_id 요청·응답 불일치 — 프록시/캐시 이상 가능', {
+      requested: req,
+      server: srv,
+    })
+    return
+  }
+  if (!_scheduleDeviceIdHintLogged) {
+    _scheduleDeviceIdHintLogged = true
+    console.info(
+      '[DID player] 서버 확인 device_id (CMS 디바이스 목록의 device_id와 같아야 실시간 화면이 동작합니다):',
+      srv,
+    )
+  }
 }
 
 /** 등록 직후·불안정 네트워크에서 한 번 실패하면 화면이 비어 보이는 것 완화 */

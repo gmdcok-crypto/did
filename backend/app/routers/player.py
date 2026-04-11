@@ -109,6 +109,9 @@ class ZoneItem(BaseModel):
 
 
 class ScheduleResponse(BaseModel):
+    """device_id: DB에 등록된 기기 UUID — 플레이어가 localStorage와 일치하는지 확인용."""
+
+    device_id: str
     layout_id: str
     layout_config: Optional[dict]
     zones: list
@@ -145,6 +148,7 @@ async def get_schedule(
     schedule = result.scalar_one_or_none()
     if not schedule:
         return ScheduleResponse(
+            device_id=device.device_id,
             layout_id="full",
             layout_config=None,
             zones=[
@@ -165,6 +169,7 @@ async def get_schedule(
     if not campaign:
         # zones=[] 를 주면 플레이어가 Zone을 하나도 안 그려 전체 검은 화면만 됨
         return ScheduleResponse(
+            device_id=device.device_id,
             layout_id="full",
             layout_config=None,
             zones=[
@@ -307,6 +312,7 @@ async def get_schedule(
         ]
 
     return ScheduleResponse(
+        device_id=device.device_id,
         layout_id=schedule.layout_id or "full",
         layout_config=schedule.layout_config,
         zones=zones,
