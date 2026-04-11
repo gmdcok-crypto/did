@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, API_BASE } from '../lib/api'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -12,6 +12,17 @@ export default function Dashboard() {
   })
   const [recentDevices, setRecentDevices] = useState([])
   const [loading, setLoading] = useState(true)
+
+  const refreshDeviceStats = useCallback(async () => {
+    const devices = await api('/devices').catch(() => [])
+    const devList = Array.isArray(devices) ? devices : []
+    setStats((s) => ({
+      ...s,
+      devices: devList.length,
+      onlineDevices: devList.filter((d) => d.status === 'online').length,
+    }))
+    setRecentDevices(devList.slice(-5).reverse())
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -32,6 +43,22 @@ export default function Dashboard() {
       setLoading(false)
     })
   }, [])
+
+  // 디바이스 탭과 동일: 기기 온라인 등 변경 시 대시보드 숫자도 갱신 (처음만 보고 오프라인 고정 방지)
+  useEffect(() => {
+    const es = new EventSource(`${API_BASE}/devices/events`)
+    es.onmessage = () => refreshDeviceStats()
+    es.onerror = () => es.close()
+    return () => es.close()
+  }, [refreshDeviceStats])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshDeviceStats()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [refreshDeviceStats])
 
   if (loading) return <div className="loading">로딩 중...</div>
 
