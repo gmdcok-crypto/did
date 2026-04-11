@@ -49,6 +49,70 @@ export async function purgePlayerScheduleCaches() {
   } catch (_) {}
 }
 
+const LEGACY_SCHEDULE_CACHE_KEY = 'did_schedule_cache'
+const SCHEDULE_CACHE_PREFIX = 'did_schedule_cache:'
+const CACHE_DEVICE_FIELD = '_did_cache_device'
+
+/** 스케줄 오프라인 폴백은 기기별 키 + 기기 ID 검증 (단일 키는 재등록·뒤로가기 후 옛 JSON과 섞임) */
+export function scheduleCacheStorageKey(deviceId) {
+  if (!deviceId || !String(deviceId).trim()) return LEGACY_SCHEDULE_CACHE_KEY
+  return `${SCHEDULE_CACHE_PREFIX}${String(deviceId).trim()}`
+}
+
+export function saveScheduleToStorage(deviceId, data) {
+  if (!deviceId || !data || typeof sessionStorage === 'undefined') return
+  const wrapped = { ...data, [CACHE_DEVICE_FIELD]: String(deviceId).trim() }
+  const key = scheduleCacheStorageKey(deviceId)
+  const s = JSON.stringify(wrapped)
+  try {
+    sessionStorage.setItem(key, s)
+  } catch (_) {}
+  try {
+    localStorage.setItem(key, s)
+  } catch (_) {}
+  try {
+    sessionStorage.removeItem(LEGACY_SCHEDULE_CACHE_KEY)
+    localStorage.removeItem(LEGACY_SCHEDULE_CACHE_KEY)
+  } catch (_) {}
+}
+
+export function readScheduleFromStorage(deviceId) {
+  if (!deviceId || typeof sessionStorage === 'undefined') return null
+  const key = scheduleCacheStorageKey(deviceId)
+  let raw = sessionStorage.getItem(key)
+  if (!raw && typeof localStorage !== 'undefined') raw = localStorage.getItem(key)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    if (parsed[CACHE_DEVICE_FIELD] !== String(deviceId).trim()) return null
+    const { [CACHE_DEVICE_FIELD]: _d, ...rest } = parsed
+    return rest
+  } catch {
+    return null
+  }
+}
+
+/** 기기 삭제·재등록·URL로 기기 바꿀 때 — 옛 스케줄 JSON이 섞이지 않게 전부 제거 */
+export function clearAllScheduleStorageCaches() {
+  const sweep = (storage) => {
+    if (!storage) return
+    try {
+      storage.removeItem(LEGACY_SCHEDULE_CACHE_KEY)
+      const drop = []
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i)
+        if (k && (k === LEGACY_SCHEDULE_CACHE_KEY || k.startsWith(SCHEDULE_CACHE_PREFIX))) drop.push(k)
+      }
+      drop.forEach((k) => storage.removeItem(k))
+    } catch (_) {}
+  }
+  sweep(sessionStorage)
+  try {
+    sweep(localStorage)
+  } catch (_) {}
+}
+
 /** localStorage에 없으면 임시 ID 생성 (등록 전까지 사용) */
 export function getOrCreateDeviceId() {
   let id = localStorage.getItem(DEVICE_ID_KEY)

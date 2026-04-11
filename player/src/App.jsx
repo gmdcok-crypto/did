@@ -13,6 +13,9 @@ import {
   notifyPlayerOffline,
   DEVICE_NOT_FOUND,
   purgePlayerScheduleCaches,
+  saveScheduleToStorage,
+  readScheduleFromStorage,
+  clearAllScheduleStorageCaches,
 } from './lib/api'
 import { capturePlayerZones } from './lib/capture'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
@@ -118,6 +121,15 @@ export default function App() {
     deviceIdRef.current = deviceId
   }, [deviceId])
 
+  // 옛 단일 키 did_schedule_cache 가 남아 있으면 다른 기기·세션과 섞여 폴백이 오염됨 → 제거
+  useEffect(() => {
+    if (!deviceId) return
+    try {
+      sessionStorage.removeItem('did_schedule_cache')
+      localStorage.removeItem('did_schedule_cache')
+    } catch (_) {}
+  }, [deviceId])
+
   const loadSchedule = useCallback(async (forceRefresh = false) => {
     if (!deviceId) return
     try {
@@ -125,18 +137,14 @@ export default function App() {
       const data = await fetchSchedule(deviceId, forceRefresh ? { cacheBust: true } : {})
       setSchedule(data)
       if (data) {
-        sessionStorage.setItem('did_schedule_cache', JSON.stringify(data))
-        try { localStorage.setItem('did_schedule_cache', JSON.stringify(data)) } catch (_) {}
+        saveScheduleToStorage(deviceId, data)
       }
       return data
     } catch (e) {
       // CMS에서 기기 삭제됨: 로컬/캐시로 옛 스케줄 재생하지 않고 재등록 유도
       if (e.code === DEVICE_NOT_FOUND) {
         clearDeviceId()
-        sessionStorage.removeItem('did_schedule_cache')
-        try {
-          localStorage.removeItem('did_schedule_cache')
-        } catch (_) {}
+        clearAllScheduleStorageCaches()
         await purgePlayerScheduleCaches()
         setDeviceIdState(null)
         setSchedule(null)
@@ -144,14 +152,11 @@ export default function App() {
         setShowSettings(true)
         return null
       }
-      const cached = sessionStorage.getItem('did_schedule_cache') || (typeof localStorage !== 'undefined' ? localStorage.getItem('did_schedule_cache') : null)
+      const cached = readScheduleFromStorage(deviceId)
       if (cached && !forceRefresh) {
-        try {
-          const parsed = JSON.parse(cached)
-          setSchedule(parsed)
-          setError(null)
-          return parsed
-        } catch (_) {}
+        setSchedule(cached)
+        setError(null)
+        return cached
       }
       const msg = e?.message || String(e)
       console.error('[DID player] 스케줄 요청 실패:', msg)
@@ -168,6 +173,8 @@ export default function App() {
   useEffect(() => {
     const fromUrl = getDeviceIdFromUrl()
     if (fromUrl) {
+      const prev = getDeviceId()
+      if (prev && prev !== fromUrl.trim()) clearAllScheduleStorageCaches()
       setDeviceId(fromUrl)
       setDeviceIdState(fromUrl)
       const url = new URL(window.location.href)
@@ -230,12 +237,7 @@ export default function App() {
 
   useEffect(() => {
     if (!deviceId) return
-    loadSchedule().then((data) => {
-      if (data) {
-        sessionStorage.setItem('did_schedule_cache', JSON.stringify(data))
-        try { localStorage.setItem('did_schedule_cache', JSON.stringify(data)) } catch (_) {}
-      }
-    })
+    loadSchedule()
     const t = setInterval(loadSchedule, POLL_INTERVAL_MS)
     let es = null
     const connect = () => {
@@ -337,18 +339,18 @@ export default function App() {
         null,
         getDeviceId() || undefined
       )
+      clearAllScheduleStorageCaches()
       setDeviceIdState(id)
       setRegisterName('')
       setRegisterLocation('')
       setRegisterAuthCode('')
       setShowSettings(false)
-      // 등록 직후에는 아직 deviceId 상태가 갱신되지 않으므로, 새 id로 스케줄 요청해 기기를 online으로 표시
+      // 등록 직후 새 id로 스케줄 로드 (loadSchedule()는 아직 옛 deviceId 클로저라 호출하면 안 됨)
       try {
         const data = await fetchSchedule(id)
         setSchedule(data)
-        if (data) sessionStorage.setItem('did_schedule_cache', JSON.stringify(data))
+        if (data) saveScheduleToStorage(id, data)
       } catch (_) {}
-      loadSchedule()
     } catch (e) {
       setRegisterError(e.message || '등록 실패')
     }
