@@ -244,26 +244,38 @@ export default function Devices() {
       if (livePollAbortRef.current !== myAbort) return
       const deadline = Date.now() + 120000
       let first = true
+      /** @type {Record<string, unknown>|null} */
+      let lastSt = null
       while (Date.now() < deadline) {
         if (livePollAbortRef.current !== myAbort) return
         if (!first) {
-          await new Promise((r) => setTimeout(r, 1000))
+          await new Promise((r) => setTimeout(r, 700))
         }
         first = false
         const st = await api(`/devices/${d.id}/live-screen/status`)
+        lastSt = st || null
         if (livePollAbortRef.current !== myAbort) return
         const last = String(st?.last_ticket ?? '').trim()
-        if (last && last === ticket && st?.image_url) {
-          const src = `${getUploadsOrigin()}${st.image_url}?t=${Date.now()}`
+        // 서버가 image_url 을 빠뜨리는 경우 대비: 업로드 완료(pending=false)+티켓 일치 시 고정 경로 시도
+        const fallbackPath = `/uploads/screenshots/${d.device_id}.jpg`
+        const path =
+          st?.image_url ||
+          (last && last === ticket && st?.pending === false ? fallbackPath : null)
+        if (last && last === ticket && path) {
+          const p = String(path).startsWith('/') ? String(path) : `/${path}`
+          const src = `${getUploadsOrigin()}${p}?t=${Date.now()}`
           setLiveModal((m) => ({ ...m, loading: false, imageSrc: src }))
           return
         }
       }
+      const hint =
+        lastSt != null
+          ? ` (서버: pending=${String(lastSt.pending)}, image_url=${lastSt.image_url ? '있음' : '없음'}, 티켓일치=${String(lastSt.last_ticket ?? '').trim() === ticket ? '예' : '아니오'})`
+          : ''
       setLiveModal((m) => ({
         ...m,
         loading: false,
-        error:
-          '시간 내에 화면을 받지 못했습니다. 기기 전원·네트워크·플레이어 실행을 확인하세요.',
+        error: `시간 내에 화면을 받지 못했습니다. 플레이어 탭을 켠 뒤 다시 시도하세요.${hint} Railway를 2개 이상 인스턴스로 띄운 경우 업로드 파일이 다른 서버에만 있어 이미지가 안 나올 수 있습니다.`,
       }))
     } catch (e) {
       if (livePollAbortRef.current !== myAbort) return

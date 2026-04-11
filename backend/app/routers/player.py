@@ -386,6 +386,10 @@ async def live_screen_upload(
         raise HTTPException(status_code=404, detail="Device not found")
     t = (ticket or "").strip()
     if not device.live_screen_pending or (device.live_screen_ticket or "") != t:
+        print(
+            f"[live_screen_upload] reject device_id={(device_id or '')[:12]} pending={getattr(device, 'live_screen_pending', None)} ticket_match={(device.live_screen_ticket or '') == t}",
+            flush=True,
+        )
         raise HTTPException(status_code=400, detail="유효하지 않은 캡처 요청입니다.")
 
     raw = await file.read()
@@ -415,4 +419,5 @@ async def live_screen_upload(
     device.live_screen_last_ticket = t
     device.live_screen_at = datetime.utcnow()
     await db.commit()
+    print(f"[live_screen_upload] ok device_id={device.device_id[:8]}… ticket={t[:8]}… bytes={len(raw)}", flush=True)
     return {"ok": True}
