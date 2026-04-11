@@ -345,9 +345,15 @@ export default function Devices() {
     ws.onmessage = (ev) => {
       clearTimeout(stallTimer)
       liveStallTimerRef.current = null
-      if (typeof ev.data === 'string') {
+      let rawText = null
+      if (typeof ev.data === 'string') rawText = ev.data
+      else if (ev.data instanceof ArrayBuffer) {
+        const s = new TextDecoder('utf-8').decode(ev.data).trim()
+        if (s.startsWith('{')) rawText = s
+      }
+      if (rawText) {
         try {
-          const j = JSON.parse(ev.data)
+          const j = JSON.parse(rawText)
           if (j && j.t === 'manifest') {
             setLiveModal((m) => ({ ...m, liveManifest: j, loading: false, error: null }))
             return

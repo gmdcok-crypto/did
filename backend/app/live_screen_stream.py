@@ -113,6 +113,14 @@ class LiveScreenStreamHub:
             except Exception:
                 pass
 
+    def clear_device_caches(self, device_id: str) -> None:
+        """새 실시간 세션 시 이전 JPEG/매니페스트가 CMS에 먼저 나가지 않도록."""
+        did = (device_id or "").strip()
+        if not did:
+            return
+        self._last.pop(did, None)
+        self._last_manifest.pop(did, None)
+
 
 hub = LiveScreenStreamHub()
 
@@ -200,6 +208,21 @@ async def get_last_manifest_json(device_id: str) -> Optional[str]:
         except Exception as e:
             logger.warning("get_last_manifest_json redis: %s", e)
     return hub.last_manifest(did)
+
+
+async def clear_live_screen_session(device_id: str) -> None:
+    """CMS가 새로 실시간을 요청했을 때 Redis·메모리에 남은 이전 스냅샷 제거."""
+    did = (device_id or "").strip()
+    if not did:
+        return
+    hub.clear_device_caches(did)
+    r = await get_redis()
+    if r:
+        try:
+            await r.delete(redis_last_frame_key(did))
+            await r.delete(redis_manifest_json_key(did))
+        except Exception as e:
+            logger.warning("clear_live_screen_session redis delete: %s", e)
 
 
 async def push_manifest(device_id: str, text: str) -> None:

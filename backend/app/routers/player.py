@@ -389,12 +389,15 @@ async def ws_player_live_screen_push(websocket: WebSocket, device_id: str, ticke
     try:
         while True:
             msg = await websocket.receive()
-            if msg.get("type") != "websocket.receive":
+            mtype = msg.get("type")
+            if mtype == "websocket.disconnect":
+                break
+            if mtype != "websocket.receive":
                 continue
-            if msg.get("bytes") is not None:
-                await live_screen_push_frame(did_key, msg["bytes"])
-            if msg.get("text") is not None:
+            if "text" in msg and msg["text"] is not None:
                 await live_screen_push_manifest(did_key, msg["text"])
+            elif "bytes" in msg and msg.get("bytes"):
+                await live_screen_push_frame(did_key, msg["bytes"])
     except WebSocketDisconnect:
         pass
     except Exception:

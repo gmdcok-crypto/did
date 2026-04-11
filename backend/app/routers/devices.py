@@ -16,6 +16,7 @@ from app.database import get_db, AsyncSessionLocal
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.live_screen_stream import (
+    clear_live_screen_session,
     get_last_jpeg,
     get_last_manifest_json,
     get_redis,
@@ -308,6 +309,7 @@ async def request_device_live_screen(
     device.live_screen_ticket = ticket
     device.live_screen_pending = True
     await db.commit()
+    await clear_live_screen_session(device.device_id)
     broadcast_live_screen_request(device.device_id)
     print(
         f"[live_screen_request] row id={id} device_id={device.device_id} ticket={ticket[:8]}…",
@@ -422,9 +424,6 @@ async def ws_cms_live_screen_view(
         ch_man = redis_manifest_pub_channel(did)
         await pubsub.subscribe(ch_img, ch_man)
         try:
-            last = await r.get(redis_last_frame_key(did))
-            if last and len(last) >= 32:
-                await websocket.send_bytes(last)
             last_m = await r.get(redis_manifest_json_key(did))
             if last_m:
                 txt = (

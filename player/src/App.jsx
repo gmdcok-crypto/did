@@ -175,11 +175,37 @@ export default function App() {
   const deviceIdRef = useRef(deviceId)
   const scheduleRef = useRef(schedule)
   const liveZonesRef = useRef({})
+  const liveScreenWsRef = useRef(null)
   const liveScreenTickRef = useRef(async () => {})
   const liveScreenStreamCloseRef = useRef(() => {})
 
   useEffect(() => {
     scheduleRef.current = schedule
+  }, [schedule])
+
+  /** 실시간 WS가 열린 뒤 스케줄이 바뀌면 매니페스트를 즉시 한 번 더 보냄 */
+  useEffect(() => {
+    const w = liveScreenWsRef.current
+    if (!w || w.readyState !== WebSocket.OPEN) return
+    const sch = scheduleRef.current
+    const zlist = sch?.zones?.length ? sch.zones : []
+    const manifest = {
+      t: 'manifest',
+      v: 1,
+      layout_id: sch?.layout_id || 'full',
+      zones: zlist.map((z) => {
+        const zid = z.id != null ? String(z.id) : ''
+        const cur = liveZonesRef.current[zid]
+        return {
+          id: zid,
+          ratio: typeof z.ratio === 'number' && z.ratio > 0 ? z.ratio : 1,
+          current: cur || null,
+        }
+      }),
+    }
+    try {
+      w.send(JSON.stringify(manifest))
+    } catch (_) {}
   }, [schedule])
 
   const onLiveZoneMedia = useCallback((zoneId, payload) => {
@@ -346,6 +372,7 @@ export default function App() {
         frameTimer = null
       }
       if (ws) {
+        liveScreenWsRef.current = null
         try {
           ws.close()
         } catch (_) {}
@@ -399,6 +426,7 @@ export default function App() {
         ws.binaryType = 'arraybuffer'
         ws.onopen = () => {
           if (cancelled) return
+          liveScreenWsRef.current = ws
           if (frameTimer) clearInterval(frameTimer)
           frameTimer = setInterval(sendManifest, 400)
           sendManifest()
@@ -407,6 +435,7 @@ export default function App() {
           closeStream()
         }
         ws.onclose = () => {
+          liveScreenWsRef.current = null
           if (frameTimer) {
             clearInterval(frameTimer)
             frameTimer = null
