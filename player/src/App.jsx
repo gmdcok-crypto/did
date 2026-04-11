@@ -340,7 +340,9 @@ export default function App() {
           if (cancelled) return
           let blob = await capturePlayerZones(root)
           if (!blob && attempt >= 5) {
-            blob = await capturePlaceholderBlob('미디어 캡처 실패(CORS·로딩) · 동일 출처 미디어 권장')
+            blob = await capturePlaceholderBlob(
+              '미디어 캡처 실패(CORS·로딩). /uploads 동일 출처 권장. 외부 호스트는 R2 CORS + VITE_MEDIA_CROSSORIGIN_HOSTS',
+            )
           }
           if (blob && !cancelled) {
             const ok = await uploadLiveScreen(id, ticket, blob)
