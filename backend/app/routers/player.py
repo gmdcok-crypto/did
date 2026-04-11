@@ -55,6 +55,26 @@ def _non_empty_content_id_list(raw) -> Optional[list]:
     return None
 
 
+def _coerce_int_ids(raw: list) -> list:
+    """JSON/CMS에서 문자열로 온 ID를 Content.id(정수 PK)와 맞춤."""
+    out = []
+    for x in raw:
+        try:
+            out.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _non_empty_int_id_list(raw) -> Optional[list]:
+    """스케줄 content_ids 용: 비어 있지 않은 정수 ID 목록만."""
+    base = _non_empty_content_id_list(raw)
+    if not base:
+        return None
+    coerced = _coerce_int_ids(base)
+    return coerced if len(coerced) > 0 else None
+
+
 async def _schedule_events_generator():
     q = subscribe_schedule()
     try:
@@ -166,7 +186,7 @@ async def get_schedule(
     # 풀 레이아웃 + 비어 있지 않은 content_ids → 스케줄에서 고른 콘텐츠만 사용 (캠페인 소속 무시)
     # CMS는 full 레이아웃에 항상 content_ids 키를 넣고 [] 를 보냄 → 키만 보면 빈 재생목록이 되어
     # 캠페인 미디어가 전부 빠지는 버그가 있었음. [] 는 "선택 없음"으로 캠페인 전체 재생으로 폴백.
-    full_ordered_ids = _non_empty_content_id_list(layout_config.get("content_ids") if layout_config else None)
+    full_ordered_ids = _non_empty_int_id_list(layout_config.get("content_ids") if layout_config else None)
     if (schedule.layout_id or "full") == "full" and full_ordered_ids:
         order_ids = full_ordered_ids
         result = await db.execute(select(Content).where(Content.id.in_(order_ids)))
@@ -201,7 +221,7 @@ async def get_schedule(
             }
             for _, c in rows
         ]
-        ordered = _non_empty_content_id_list(layout_config.get("content_ids"))
+        ordered = _non_empty_int_id_list(layout_config.get("content_ids"))
         if (schedule.layout_id or "full") == "full" and ordered:
             order_ids = ordered
             by_id = {it["id"]: it for it in contents_ordered}
@@ -235,6 +255,9 @@ async def get_schedule(
 
     async def get_contents_for_zone(zone_config):
         content_ids = zone_config.get("content_ids")
+        if not content_ids:
+            return contents
+        content_ids = _coerce_int_ids(list(content_ids))
         if not content_ids:
             return contents
         result = await db.execute(select(Content).where(Content.id.in_(content_ids)))

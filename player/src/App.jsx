@@ -389,10 +389,17 @@ export default function App() {
   }
 
   const scheduleLoadError = Boolean(error && !schedule)
+  /** 첫 스케줄 응답 전·요청 중 — 오류는 아님 */
+  const scheduleLoading = Boolean(deviceId && schedule === null && !error)
 
   return (
     <>
     <div className="player-full">
+      {scheduleLoading && (
+        <div className="player-schedule-loading-banner" role="status">
+          스케줄 연결 중…
+        </div>
+      )}
       {scheduleLoadError && (
         <div className="player-schedule-error-overlay player-full error-screen">
           <div className="player-settings-wrap">
@@ -451,13 +458,14 @@ export default function App() {
         className="player-zones"
         style={{
           display: 'grid',
+          // minmax(0, fr) — 그리드 자식 min-width:auto 때문에 존 너비·높이 0으로 붕괴해 검은 화면만 나오는 현상 방지
           ...(schedule?.layout_id === 'split_v'
             ? {
-                gridTemplateRows: zones.map((z) => `${zoneRatio(z) * 100}fr`).join(' '),
-                gridTemplateColumns: '1fr',
+                gridTemplateRows: zones.map((z) => `minmax(0,${zoneRatio(z) * 100}fr)`).join(' '),
+                gridTemplateColumns: 'minmax(0,1fr)',
               }
             : {
-                gridTemplateColumns: zones.map((z) => `${zoneRatio(z) * 100}fr`).join(' '),
+                gridTemplateColumns: zones.map((z) => `minmax(0,${zoneRatio(z) * 100}fr)`).join(' '),
               }),
           gap: 0,
         }}
@@ -596,19 +604,41 @@ function NextVideoPreload({ item, mediaBaseUrl }) {
   )
 }
 
+function parseContentIdForEvents(id) {
+  if (typeof id === 'number' && Number.isFinite(id)) return id
+  if (typeof id === 'string' && /^\d+$/.test(id.trim())) return parseInt(id.trim(), 10)
+  return null
+}
+
 function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady, onVideoEnded }) {
   const hasReported = useRef(false)
+  const videoRef = useRef(null)
   const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
   const mediaCrossOrigin = crossOriginForMediaUrl(url)
+  const contentIdInt = parseContentIdForEvents(item.id)
+  const logId = item.id ?? item.url ?? ''
 
   useEffect(() => {
+    if (contentIdInt == null) return
     if (hasReported.current) return
     hasReported.current = true
-    reportEvent(item.id, 'impression')
+    reportEvent(contentIdInt, 'impression')
     return () => {
-      reportEvent(item.id, 'complete')
+      reportEvent(contentIdInt, 'complete')
     }
-  }, [item.id, reportEvent])
+  }, [contentIdInt, reportEvent])
+
+  useEffect(() => {
+    if (item.type !== 'video' || !url) return
+    const el = videoRef.current
+    if (!el) return
+    const tryPlay = () => {
+      el.play?.().catch(() => {})
+    }
+    tryPlay()
+    el.addEventListener('canplay', tryPlay)
+    return () => el.removeEventListener('canplay', tryPlay)
+  }, [item.type, url])
 
   if (item.type === 'video') {
     if (!url) {
@@ -620,6 +650,7 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
     }
     return (
       <video
+        ref={videoRef}
         className="media media-video"
         src={url}
         crossOrigin={mediaCrossOrigin}
@@ -629,9 +660,10 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
         preload="auto"
         onCanPlay={() => onReady?.()}
         onLoadedData={() => onReady?.()}
+        onPlay={() => onReady?.()}
         onEnded={() => onVideoEnded?.()}
         onError={() => {
-          reportEvent(item.id, 'error')
+          if (contentIdInt != null) reportEvent(contentIdInt, 'error')
           onVideoEnded?.()
         }}
       />
@@ -654,8 +686,8 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
         alt=""
         onLoad={() => onReady?.()}
         onError={() => {
-          logMediaLoadFailure('image', item.id, url)
-          reportEvent(item.id, 'error')
+          logMediaLoadFailure('image', logId, url)
+          if (contentIdInt != null) reportEvent(contentIdInt, 'error')
         }}
       />
     )
