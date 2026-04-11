@@ -1,6 +1,6 @@
 /**
- * 플레이어 .player-zones 영역을 JPEG Blob으로 캡처 (video/img). iframe·크로스오리진 이미지는 제한될 수 있음.
- * 레이아웃·비디오 프레임이 잡힐 때까지 짧게 대기해 검은 캡처를 줄임.
+ * 플레이어 .player-zones 영역을 JPEG Blob으로 캡처 (video/img). iframe·크로스오리진 제한 시 영역 스킵.
+ * crossOrigin 미설정 시 다른 출처 비디오는 canvas drawImage 가 막혀 검은 화면만 나올 수 있음 → mediaCrossOrigin.js 와 함께 사용.
  */
 function waitNextPaint() {
   return new Promise((resolve) => {
@@ -19,6 +19,20 @@ function waitVideoReady(videoEl, ms) {
   ])
 }
 
+function waitVideoFrame(videoEl) {
+  return new Promise((resolve) => {
+    if (!videoEl) {
+      resolve()
+      return
+    }
+    if (typeof videoEl.requestVideoFrameCallback === 'function') {
+      videoEl.requestVideoFrameCallback(() => resolve())
+    } else {
+      requestAnimationFrame(resolve)
+    }
+  })
+}
+
 export async function capturePlayerZones(rootEl) {
   if (!rootEl || rootEl.clientWidth < 2 || rootEl.clientHeight < 2) {
     return null
@@ -27,7 +41,10 @@ export async function capturePlayerZones(rootEl) {
   const wraps = rootEl.querySelectorAll('.media-wrap:not(.media-wrap-prev)')
   for (const wrap of wraps) {
     const v = wrap.querySelector('video')
-    if (v) await waitVideoReady(v, 800)
+    if (v) {
+      await waitVideoReady(v, 1200)
+      await waitVideoFrame(v)
+    }
   }
 
   const scale = Math.min(1, 1280 / rootEl.clientWidth)
@@ -43,6 +60,7 @@ export async function capturePlayerZones(rootEl) {
   ctx.fillStyle = '#111'
   ctx.fillRect(0, 0, w, h)
   const rootRect = rootEl.getBoundingClientRect()
+  let drewMedia = false
   for (const wrap of wraps) {
     const r = wrap.getBoundingClientRect()
     const dx = (r.left - rootRect.left) * scale
@@ -53,29 +71,42 @@ export async function capturePlayerZones(rootEl) {
     const img = wrap.querySelector('img')
     const iframe = wrap.querySelector('iframe')
     try {
-      if (v && v.readyState >= 2) {
-        ctx.drawImage(v, dx, dy, dw, dh)
-      } else if (v && v.readyState >= 1) {
-        try {
+      if (v) {
+        await waitVideoFrame(v)
+        if (v.readyState >= 2) {
           ctx.drawImage(v, dx, dy, dw, dh)
-        } catch {
-          ctx.fillStyle = '#1a1a1c'
-          ctx.fillRect(dx, dy, dw, dh)
+          drewMedia = true
+        } else if (v.readyState >= 1) {
+          try {
+            ctx.drawImage(v, dx, dy, dw, dh)
+            drewMedia = true
+          } catch {
+            ctx.fillStyle = '#1a1a1c'
+            ctx.fillRect(dx, dy, dw, dh)
+          }
         }
       } else if (img && img.complete && img.naturalWidth) {
         ctx.drawImage(img, dx, dy, dw, dh)
+        drewMedia = true
       } else if (iframe) {
         ctx.fillStyle = '#2a2a2e'
         ctx.fillRect(dx, dy, dw, dh)
         ctx.fillStyle = '#71717a'
         ctx.font = `${Math.max(12, 14 * scale)}px system-ui, sans-serif`
         ctx.fillText('HTML', dx + 8 * scale, dy + 22 * scale)
+        drewMedia = true
       }
     } catch {
-      /* CORS 등으로 drawImage 실패 시 해당 영역 스킵 */
+      /* CORS 등으로 drawImage 실패 */
     }
   }
+  if (!drewMedia && wraps.length > 0) {
+    ctx.fillStyle = '#a1a1aa'
+    ctx.font = `${Math.max(11, 13 * scale)}px system-ui, sans-serif`
+    const msg = '미디어 캡처 불가(CORS·로딩). 미디어를 플레이어와 같은 도메인으로 두거나 crossOrigin을 확인하세요.'
+    ctx.fillText(msg.slice(0, Math.min(48, msg.length)), 12 * scale, Math.max(24, h * 0.5))
+  }
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85)
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92)
   })
 }
