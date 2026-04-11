@@ -266,7 +266,7 @@ export default function Devices() {
           ...m,
           loading: false,
           error:
-            '화면이 오지 않습니다. 플레이어가 켜져 있어도, API 서버 여러 인스턴스(Railway 등)에 요청이 갈라지면 실시간 스트림이 붙지 않을 수 있습니다. 단일 인스턴스·동일 도메인에서 다시 시도하거나 네트워크·wss 차단을 확인하세요.',
+            '화면이 오지 않습니다. Railway 등 API가 여러 인스턴스면 백엔드에 Redis(REDIS_URL)를 연결한 뒤 배포하세요. 그 외에는 동일 도메인·wss 차단·플레이어 연결을 확인하세요.',
         }
       })
     }, stallMs)

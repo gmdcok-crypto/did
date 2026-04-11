@@ -11,7 +11,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.database import get_db, AsyncSessionLocal
 from app.models import Device, Schedule, Campaign, CampaignContent, Content
-from app.live_screen_stream import hub as live_screen_hub
+from app.live_screen_stream import push_frame as live_screen_push_frame
 from app.sse_broadcast import subscribe_schedule, unsubscribe_schedule, broadcast_device_list_updated
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -388,7 +388,7 @@ async def ws_player_live_screen_push(websocket: WebSocket, device_id: str, ticke
     try:
         while True:
             data = await websocket.receive_bytes()
-            live_screen_hub.push_frame(did_key, data)
+            await live_screen_push_frame(did_key, data)
     except WebSocketDisconnect:
         pass
     except Exception:

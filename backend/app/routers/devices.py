@@ -2,6 +2,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import StreamingResponse
+from starlette.websockets import WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
@@ -13,7 +14,7 @@ from app.auth import decode_access_token
 from app.database import get_db, AsyncSessionLocal
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
-from app.live_screen_stream import hub as live_screen_hub
+from app.live_screen_stream import get_redis, hub as live_screen_hub, redis_channel
 from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
 from app.datetime_kst import to_kst_iso
@@ -350,6 +351,28 @@ async def ws_cms_live_screen_view(
             await websocket.close(code=4403)
             return
         did = device.device_id
+    r = await get_redis()
+    if r:
+        pubsub = r.pubsub()
+        ch = redis_channel(did)
+        await pubsub.subscribe(ch)
+        try:
+            async for message in pubsub.listen():
+                if message["type"] != "message" or not message.get("data"):
+                    continue
+                await websocket.send_bytes(message["data"])
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            try:
+                await pubsub.unsubscribe(ch)
+                await pubsub.close()
+            except Exception:
+                pass
+        return
+
     q = live_screen_hub.subscribe(did)
     try:
         while True:

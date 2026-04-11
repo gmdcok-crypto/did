@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     cors_origins_extra: str = ""
     # last_seen 갱신 없이 이 시간(초)이 지나면 offline (스케줄 폴링 주기보다 길게 설정할 것 — 기본 180초=3분, 폴링 2분)
     device_offline_after_seconds: int = 180
+    # 실시간 화면 WebSocket 다중 인스턴스 공유 (Railway Redis 플러그인 → REDIS_URL 자동 주입)
+    redis_url: str = ""
 
     @field_validator("r2_bucket", mode="before")
     @classmethod

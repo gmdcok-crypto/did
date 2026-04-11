@@ -1,11 +1,26 @@
-"""CMS 실시간 화면: 플레이어→서버 WebSocket으로 JPEG 프레임 수신 후 구독자(CMS)에게 전달.
+"""CMS 실시간 화면: 플레이어 프레임을 Redis Pub/Sub 또는 인메모리로 CMS에 전달.
 
-단일 프로세스 메모리 기준(로컬·단일 Railway 인스턴스). 다중 인스턴스에서는 Redis 등 별도 브로커가 필요."""
+- REDIS_URL 이 있으면 모든 API 인스턴스가 동일 채널을 구독 → Railway 다중 워커에서도 스트림 유지.
+- 없으면 기존처럼 단일 프로세스 메모리 허브만 사용."""
+from __future__ import annotations
+
 import asyncio
-from typing import Dict, List
+import logging
+from typing import Dict, List, Optional
+
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+try:
+    import redis.asyncio as aioredis
+except ImportError:  # pragma: no cover
+    aioredis = None
 
 
 class LiveScreenStreamHub:
+    """단일 프로세스용 폴백(로컬 개발·Redis 미설정)."""
+
     def __init__(self) -> None:
         self._subs: Dict[str, List[asyncio.Queue]] = {}
         self._last: Dict[str, bytes] = {}
@@ -50,3 +65,36 @@ class LiveScreenStreamHub:
 
 
 hub = LiveScreenStreamHub()
+
+_redis = None  # redis.asyncio.Redis | None
+
+
+def redis_channel(device_id: str) -> str:
+    return f"did:live_screen:{device_id}"
+
+
+async def get_redis():
+    """REDIS_URL / Settings.redis_url 이 있을 때만 클라이언트 생성."""
+    global _redis
+    if aioredis is None:
+        return None
+    url = (get_settings().redis_url or "").strip()
+    if not url:
+        return None
+    if _redis is None:
+        _redis = aioredis.from_url(url, decode_responses=False)
+    return _redis
+
+
+async def push_frame(device_id: str, jpeg: bytes) -> None:
+    """플레이어가 보낸 JPEG: Redis 우선, 실패 시 인메모리 허브."""
+    if len(jpeg) < 32:
+        return
+    r = await get_redis()
+    if r:
+        try:
+            await r.publish(redis_channel(device_id), jpeg)
+            return
+        except Exception as e:
+            logger.warning("live_screen redis publish failed, using in-memory hub: %s", e)
+    hub.push_frame(device_id, jpeg)
