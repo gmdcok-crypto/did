@@ -13,7 +13,7 @@ class Schedule(Base):
     name: Mapped[str] = mapped_column(String(200), index=True)
     campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"))
     device_group_id: Mapped[int] = mapped_column(ForeignKey("device_groups.id"))
-    layout_id: Mapped[str] = mapped_column(String(50), default="full")  # full, split_h, split_v, etc.
+    layout_id: Mapped[str] = mapped_column(String(50), default="full")  # full, full_portrait, split_h, split_v, etc.
     layout_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

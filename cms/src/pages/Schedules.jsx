@@ -9,9 +9,14 @@ const TABS = [
 
 const LAYOUT_OPTIONS = [
   { value: 'full', label: '전체(full)' },
+  { value: 'full_portrait', label: '전체화면(세로)(full_portrait)' },
   { value: 'split_h', label: '가로 분할(split_h)' },
   { value: 'split_v', label: '세로 분할(split_v)' },
 ]
+
+function isFullScreenLayout(layoutId) {
+  return layoutId === 'full' || layoutId === 'full_portrait'
+}
 
 export default function Schedules() {
   const [activeTab, setActiveTab] = useState('list')
@@ -42,7 +47,7 @@ export default function Schedules() {
     if (layoutId === 'split_h' || layoutId === 'split_v') {
       return { zones: [{ id: 'zone_1', ratio: 0.5, content_ids: [] }, { id: 'zone_2', ratio: 0.5, content_ids: [] }] }
     }
-    if (layoutId === 'full') {
+    if (isFullScreenLayout(layoutId)) {
       return { content_ids: [] }
     }
     return null
@@ -127,7 +132,7 @@ export default function Schedules() {
           campaign_id: cid,
           device_group_id: gid,
           layout_id: layout_id || 'full',
-          layout_config: layout_id === 'full'
+          layout_config: isFullScreenLayout(layout_id)
             ? (() => {
                 const ids = addForm.layout_config?.content_ids || []
                 return ids.length > 0 ? { content_ids: ids } : {}
@@ -149,7 +154,7 @@ export default function Schedules() {
     setEditingId(s.id)
     const layoutId = s.layout_id || 'full'
     let initialConfig = s.layout_config || defaultZoneConfig(layoutId)
-    if (layoutId === 'full' && (!initialConfig?.content_ids || initialConfig.content_ids.length === 0)) {
+    if (isFullScreenLayout(layoutId) && (!initialConfig?.content_ids || initialConfig.content_ids.length === 0)) {
       loadCampaignContentIds(s.campaign_id).then((ids) => {
         setEditForm((f) => ({ ...f, layout_config: { ...(f.layout_config || {}), content_ids: ids } }))
       })
@@ -201,7 +206,7 @@ export default function Schedules() {
           campaign_id: cid,
           device_group_id: gid,
         layout_id: layout_id || 'full',
-        layout_config: layout_id === 'full'
+        layout_config: isFullScreenLayout(layout_id)
           ? (() => {
               const ids = editForm.layout_config?.content_ids || []
               return ids.length > 0 ? { content_ids: ids } : {}
@@ -290,7 +295,7 @@ export default function Schedules() {
                                 onChange={(e) => {
                                   const cid = e.target.value
                                   setEditForm((f) => ({ ...f, campaign_id: cid }))
-                                  if (editForm.layout_id === 'full' && cid) {
+                                  if (isFullScreenLayout(editForm.layout_id) && cid) {
                                     loadCampaignContentIds(cid).then((ids) => {
                                       setEditForm((f) => ({ ...f, layout_config: { ...(f.layout_config || {}), content_ids: ids } }))
                                     })
@@ -326,9 +331,20 @@ export default function Schedules() {
                                       checked={(editForm.layout_id || 'full') === opt.value}
                                       onChange={() => {
                                         const v = opt.value
-                                        const nextConfig = defaultZoneConfig(v) || (v === 'full' ? { content_ids: editForm.layout_config?.content_ids || [] } : editForm.layout_config)
+                                        const prevLayout = editForm.layout_id
+                                        const nextConfig =
+                                          isFullScreenLayout(v) && isFullScreenLayout(prevLayout)
+                                            ? { content_ids: editForm.layout_config?.content_ids || [] }
+                                            : defaultZoneConfig(v) ||
+                                              (isFullScreenLayout(v)
+                                                ? { content_ids: editForm.layout_config?.content_ids || [] }
+                                                : editForm.layout_config)
                                         setEditForm((f) => ({ ...f, layout_id: v, layout_config: nextConfig }))
-                                        if (v === 'full' && editForm.campaign_id && (!nextConfig?.content_ids?.length)) {
+                                        if (
+                                          isFullScreenLayout(v) &&
+                                          editForm.campaign_id &&
+                                          (!nextConfig?.content_ids?.length)
+                                        ) {
                                           loadCampaignContentIds(editForm.campaign_id).then((ids) => {
                                             setEditForm((f) => ({ ...f, layout_config: { ...(f.layout_config || {}), content_ids: ids } }))
                                           })
@@ -377,7 +393,7 @@ export default function Schedules() {
                           </>
                         )}
                         </tr>
-                        {editingId === s.id && editForm.layout_id === 'full' && (
+                        {editingId === s.id && isFullScreenLayout(editForm.layout_id) && (
                           <tr>
                             <td colSpan={7} className="table-inline-edit">
                               <div className="form-row form-section">
@@ -475,7 +491,7 @@ export default function Schedules() {
                     onChange={(e) => {
                       const cid = e.target.value
                       setAddForm((f) => ({ ...f, campaign_id: cid }))
-                      if ((addForm.layout_id || 'full') === 'full' && cid) {
+                      if (isFullScreenLayout(addForm.layout_id || 'full') && cid) {
                         loadCampaignContentIds(cid).then((ids) => {
                           setAddForm((f) => ({ ...f, layout_config: { ...(f.layout_config || {}), content_ids: ids } }))
                         })
@@ -516,9 +532,14 @@ export default function Schedules() {
                           checked={(addForm.layout_id || 'full') === opt.value}
                           onChange={() => {
                             const v = opt.value
-                            const nextConfig = defaultZoneConfig(v) || (v === 'full' ? { content_ids: addForm.layout_config?.content_ids || [] } : null)
+                            const prevLayout = addForm.layout_id || 'full'
+                            const nextConfig =
+                              isFullScreenLayout(v) && isFullScreenLayout(prevLayout)
+                                ? { content_ids: addForm.layout_config?.content_ids || [] }
+                                : defaultZoneConfig(v) ||
+                                  (isFullScreenLayout(v) ? { content_ids: addForm.layout_config?.content_ids || [] } : null)
                             setAddForm((f) => ({ ...f, layout_id: v, layout_config: nextConfig }))
-                            if (v === 'full' && addForm.campaign_id) {
+                            if (isFullScreenLayout(v) && addForm.campaign_id) {
                               loadCampaignContentIds(addForm.campaign_id).then((ids) => {
                                 setAddForm((f) => ({ ...f, layout_config: { ...(f.layout_config || {}), content_ids: ids } }))
                               })
@@ -530,7 +551,7 @@ export default function Schedules() {
                     ))}
                   </div>
                 </div>
-                {addForm.layout_id === 'full' && (
+                {isFullScreenLayout(addForm.layout_id) && (
                   <div className="form-row form-section">
                     <label className="section-label">레이아웃에 쓸 이미지 선택 (전체 화면)</label>
                     <div className="content-check-list zone-select">
@@ -548,7 +569,7 @@ export default function Schedules() {
                     </div>
                   </div>
                 )}
-                {addForm.layout_id === 'full' && (
+                {isFullScreenLayout(addForm.layout_id) && (
                   <div className="form-row form-section">
                     <label className="section-label">재생 순서 (아래에서 위로 이동으로 순서 변경)</label>
                     <div className="content-order-list">

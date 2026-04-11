@@ -9,6 +9,7 @@ function LiveStreamManifestView({ manifest }) {
   const layout = manifest?.layout_id || 'full'
   const zones = Array.isArray(manifest?.zones) ? manifest.zones : []
   const splitV = layout === 'split_v'
+  const portraitFull = layout === 'full_portrait'
   if (zones.length === 0) {
     return (
       <div className="live-screen-modal-stream live-screen-modal-stream-empty">
@@ -16,25 +17,25 @@ function LiveStreamManifestView({ manifest }) {
       </div>
     )
   }
-  return (
-    <div
-      className="live-screen-modal-stream"
-      style={{
-        display: 'grid',
-        gap: 0,
-        minHeight: 'min(70vh, 520px)',
-        background: '#0f0f10',
-        ...(splitV
-          ? {
-              gridTemplateRows: zones.map((z) => `minmax(0,${Number(z.ratio) > 0 ? z.ratio : 1}fr)`).join(' '),
-              gridTemplateColumns: 'minmax(0,1fr)',
-            }
-          : {
-              gridTemplateColumns: zones.map((z) => `minmax(0,${Number(z.ratio) > 0 ? z.ratio : 1}fr)`).join(' '),
-              gridTemplateRows: 'minmax(0,1fr)',
-            }),
-      }}
-    >
+  const streamStyle = {
+    display: 'grid',
+    gap: 0,
+    background: '#0f0f10',
+    ...(splitV
+      ? {
+          gridTemplateRows: zones.map((z) => `minmax(0,${Number(z.ratio) > 0 ? z.ratio : 1}fr)`).join(' '),
+          gridTemplateColumns: 'minmax(0,1fr)',
+        }
+      : {
+          gridTemplateColumns: zones.map((z) => `minmax(0,${Number(z.ratio) > 0 ? z.ratio : 1}fr)`).join(' '),
+          gridTemplateRows: 'minmax(0,1fr)',
+        }),
+  }
+  if (!portraitFull) {
+    streamStyle.minHeight = 'min(70vh, 520px)'
+  }
+  const stream = (
+    <div className="live-screen-modal-stream" style={streamStyle}>
       {zones.map((z) => (
         <div
           key={String(z.id)}
@@ -49,6 +50,10 @@ function LiveStreamManifestView({ manifest }) {
       ))}
     </div>
   )
+  if (portraitFull) {
+    return <div className="live-screen-portrait-outer">{stream}</div>
+  }
+  return stream
 }
 
 /** 실시간 화면 타임아웃 시 표시할 원인 안내 (수집된 진단 기준) */

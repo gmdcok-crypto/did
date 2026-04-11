@@ -18,6 +18,12 @@ from app.sse_broadcast import subscribe_schedule, unsubscribe_schedule, broadcas
 router = APIRouter(prefix="/player", tags=["player"])
 
 
+def _layout_is_full_like(layout_id: Optional[str]) -> bool:
+    """full · full_portrait — 단일 존, layout_config.content_ids 로 순서 지정."""
+    lid = layout_id or "full"
+    return lid in ("full", "full_portrait")
+
+
 def _media_url_for_request(url: str, base_url: str) -> str:
     """
     미디어 URL을 플레이어와 같은 출처로 쓸 수 있게 함.
@@ -193,7 +199,7 @@ async def get_schedule(
     # CMS는 full 레이아웃에 항상 content_ids 키를 넣고 [] 를 보냄 → 키만 보면 빈 재생목록이 되어
     # 캠페인 미디어가 전부 빠지는 버그가 있었음. [] 는 "선택 없음"으로 캠페인 전체 재생으로 폴백.
     full_ordered_ids = _non_empty_int_id_list(layout_config.get("content_ids") if layout_config else None)
-    if (schedule.layout_id or "full") == "full" and full_ordered_ids:
+    if _layout_is_full_like(schedule.layout_id) and full_ordered_ids:
         order_ids = full_ordered_ids
         result = await db.execute(select(Content).where(Content.id.in_(order_ids)))
         content_rows = {c.id: c for c in result.scalars().all()}
@@ -228,7 +234,7 @@ async def get_schedule(
             for _, c in rows
         ]
         ordered = _non_empty_int_id_list(layout_config.get("content_ids"))
-        if (schedule.layout_id or "full") == "full" and ordered:
+        if _layout_is_full_like(schedule.layout_id) and ordered:
             order_ids = ordered
             by_id = {it["id"]: it for it in contents_ordered}
             contents = [by_id[cid] for cid in order_ids if cid in by_id]

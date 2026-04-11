@@ -1002,6 +1002,25 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   min-height: 0;
 }
 
+/* 스케줄 full_portrait: 플레이어와 동일하게 9:16 미리보기 */
+.live-screen-portrait-outer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 1rem 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.live-screen-portrait-outer .live-screen-modal-stream {
+  flex: 0 0 auto;
+  aspect-ratio: 9 / 16;
+  width: min(100%, calc(min(70vh, 520px) * 9 / 16));
+  max-height: min(70vh, 520px);
+  height: auto;
+  margin: 0;
+}
+
 .live-screen-modal-stream-empty {
   padding: 2rem 1.25rem;
   color: var(--text-muted);
