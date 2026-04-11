@@ -14,6 +14,7 @@ from app.deps import get_current_user
 from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
 from app.datetime_kst import to_kst_iso
+from app.device_time import is_last_seen_stale
 from app.sse_broadcast import (
     subscribe,
     unsubscribe,
@@ -32,13 +33,7 @@ def _effective_device_status(device: Device) -> str:
     """
     settings = get_settings()
     max_age = timedelta(seconds=max(60, settings.device_offline_after_seconds))
-    if not device.last_seen:
-        return "offline"
-    now = datetime.utcnow()
-    ls = device.last_seen
-    if getattr(ls, "tzinfo", None) is not None:
-        ls = ls.replace(tzinfo=None)
-    if now - ls > max_age:
+    if is_last_seen_stale(device.last_seen, max_age):
         return "offline"
     st = (device.status or "").strip().lower()
     if st in ("online", "offline", "error"):
@@ -154,13 +149,9 @@ async def list_devices(
     devices = result.scalars().all()
     settings = get_settings()
     max_age = timedelta(seconds=max(60, settings.device_offline_after_seconds))
-    now = datetime.utcnow()
     stale_updated = False
     for d in devices:
-        ls = d.last_seen
-        if getattr(ls, "tzinfo", None) is not None:
-            ls = ls.replace(tzinfo=None)
-        too_old = not d.last_seen or (now - ls > max_age)
+        too_old = is_last_seen_stale(d.last_seen, max_age)
         if too_old and (d.status or "") == "online":
             d.status = "offline"
             stale_updated = True

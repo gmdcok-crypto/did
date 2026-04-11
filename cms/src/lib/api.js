@@ -30,7 +30,12 @@ export async function api(path, options = {}) {
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  const method = (options.method || 'GET').toUpperCase()
+  let urlPath = path
+  if (method === 'GET' && typeof path === 'string' && !String(path).includes('_nocache=')) {
+    urlPath = path.includes('?') ? `${path}&_nocache=${Date.now()}` : `${path}?_nocache=${Date.now()}`
+  }
+  const res = await fetch(`${API_BASE}${urlPath}`, { ...options, headers, cache: 'no-store' })
   if (res.status === 401) {
     clearTokenAndNotify()
     const err = await res.json().catch(() => ({ detail: 'Not authenticated' }))
@@ -56,7 +61,7 @@ export async function uploadFile(path, formData) {
   const headers = {
     ...(token && { Authorization: `Bearer ${token}` }),
   }
-  const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: formData })
+  const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: formData, cache: 'no-store' })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || '업로드 실패')

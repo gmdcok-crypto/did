@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
+from starlette.requests import Request
 from starlette.responses import Response
 from sqlalchemy import text, select
 from app.database import engine, Base, AsyncSessionLocal
@@ -179,6 +180,15 @@ app = FastAPI(
     title="PWA Digital Ad CMS API",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def no_store_api_json(request: Request, call_next):
+    """프록시·브라우저가 /api 응답을 캐시해 디바이스 상태가 안 바뀌는 것 방지."""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "private, no-store, must-revalidate"
+    return response
 
 
 @app.get("/health")
