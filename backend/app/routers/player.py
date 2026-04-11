@@ -149,25 +149,25 @@ async def get_schedule(
     base_url = str(request.base_url).rstrip("/")
     layout_config = schedule.layout_config or {}
 
-    # 풀 레이아웃 + 스케줄에 content_ids 있음 → 스케줄에서 고른 콘텐츠만 사용 (캠페인 소속 무시)
-    if (schedule.layout_id or "full") == "full" and "content_ids" in layout_config:
-        order_ids = layout_config["content_ids"]
-        if not order_ids:
-            contents = []
-        else:
-            result = await db.execute(select(Content).where(Content.id.in_(order_ids)))
-            content_rows = {c.id: c for c in result.scalars().all()}
-            contents = []
-            for cid in order_ids:
-                if cid in content_rows:
-                    c = content_rows[cid]
-                    contents.append({
-                        "id": c.id,
-                        "type": c.type,
-                        "url": _media_url_for_request(c.url, base_url),
-                        "duration_sec": c.duration_sec,
-                        "name": c.name,
-                    })
+    # 풀 레이아웃 + 비어 있지 않은 content_ids → 스케줄에서 고른 콘텐츠만 사용 (캠페인 소속 무시)
+    # CMS는 full 레이아웃에 항상 content_ids 키를 넣고 [] 를 보냄 → 키만 보면 빈 재생목록이 되어
+    # 캠페인 미디어가 전부 빠지는 버그가 있었음. [] 는 "선택 없음"으로 캠페인 전체 재생으로 폴백.
+    full_ordered_ids = layout_config.get("content_ids") if layout_config else None
+    if (schedule.layout_id or "full") == "full" and full_ordered_ids:
+        order_ids = full_ordered_ids
+        result = await db.execute(select(Content).where(Content.id.in_(order_ids)))
+        content_rows = {c.id: c for c in result.scalars().all()}
+        contents = []
+        for cid in order_ids:
+            if cid in content_rows:
+                c = content_rows[cid]
+                contents.append({
+                    "id": c.id,
+                    "type": c.type,
+                    "url": _media_url_for_request(c.url, base_url),
+                    "duration_sec": c.duration_sec,
+                    "name": c.name,
+                })
     else:
         # 캠페인 소속 콘텐츠 기준 (분할 레이아웃 또는 content_ids 없을 때)
         result = await db.execute(
