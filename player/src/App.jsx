@@ -14,8 +14,10 @@ import {
   purgePlayerScheduleCaches,
 } from './lib/api'
 import { capturePlayerZones } from './lib/capture'
+import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000
+/** 스케줄 폴링 — last_seen 갱신 주기(오프라인 판정과 맞춤, 기본 2분) */
+const POLL_INTERVAL_MS = 2 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
 /** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
 const IMAGE_FADE_MS = 550
@@ -165,15 +167,23 @@ export default function App() {
         if (!data?.capture || !data?.ticket) return
         const root = zonesRef.current
         if (!root) return
-        const blob = await capturePlayerZones(root)
-        if (!blob || cancelled) return
-        await uploadLiveScreen(id, data.ticket, blob)
+        const ticket = data.ticket
+        // 비디오 프레임·업로드 준비까지 여러 번 시도 (검은 캡처·일시 실패 완화)
+        for (let attempt = 0; attempt < 10; attempt++) {
+          if (cancelled) return
+          const blob = await capturePlayerZones(root)
+          if (blob && !cancelled) {
+            const ok = await uploadLiveScreen(id, ticket, blob)
+            if (ok) return
+          }
+          await new Promise((r) => setTimeout(r, 350))
+        }
       } catch {
         /* 네트워크 오류 무시 */
       }
     }
     liveScreenTickRef.current = tick
-    const intervalMs = 5000
+    const intervalMs = 1200
     const timer = setInterval(tick, intervalMs)
     tick()
     return () => {
@@ -556,9 +566,11 @@ function Zone({ zone, reportEvent, currentContentRef, mediaBaseUrl }) {
 function NextVideoPreload({ item, mediaBaseUrl }) {
   const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
   if (!url) return null
+  const xo = crossOriginForMediaUrl(url)
   return (
     <video
       src={url}
+      crossOrigin={xo}
       preload="auto"
       muted
       playsInline
@@ -571,6 +583,7 @@ function NextVideoPreload({ item, mediaBaseUrl }) {
 function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onReady, onVideoEnded }) {
   const hasReported = useRef(false)
   const url = (item.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item.url || '')
+  const mediaCrossOrigin = crossOriginForMediaUrl(url)
 
   useEffect(() => {
     if (hasReported.current) return
@@ -593,6 +606,7 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
       <video
         className="media media-video"
         src={url}
+        crossOrigin={mediaCrossOrigin}
         autoPlay
         muted
         playsInline
@@ -620,6 +634,7 @@ function MediaBlock({ item, reportEvent, currentContentRef, mediaBaseUrl, onRead
       <img
         className="media media-image"
         src={url}
+        crossOrigin={mediaCrossOrigin}
         alt=""
         onLoad={() => onReady?.()}
         onError={() => {

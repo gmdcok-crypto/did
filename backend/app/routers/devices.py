@@ -152,6 +152,22 @@ async def list_devices(
     """디바이스 전체 목록. registered_at 이 NULL이어도 표시(기존 DB 행이 보이도록)."""
     result = await db.execute(select(Device).order_by(Device.id))
     devices = result.scalars().all()
+    settings = get_settings()
+    max_age = timedelta(seconds=max(60, settings.device_offline_after_seconds))
+    now = datetime.utcnow()
+    stale_updated = False
+    for d in devices:
+        ls = d.last_seen
+        if getattr(ls, "tzinfo", None) is not None:
+            ls = ls.replace(tzinfo=None)
+        too_old = not d.last_seen or (now - ls > max_age)
+        if too_old and (d.status or "") == "online":
+            d.status = "offline"
+            stale_updated = True
+    if stale_updated:
+        await db.commit()
+        broadcast_device_list_updated()
+
     return [
         DeviceListItem(
             id=d.id,
