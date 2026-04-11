@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     registration_auth_code: str = "dev1234"
     # DDNS/외부 접속 시 CORS 허용 출처 (쉼표 구분). 예: https://noteserver.iptime.org:5173,https://noteserver.iptime.org:5174
     cors_origins_extra: str = ""
+    # 플레이어가 스케줄을 받아 last_seen을 갱신하지 않은 채 이 시간(초)이 지나면 CMS 목록에서 offline으로 표시 (기본 7분, 스케줄 폴링 5분보다 김)
+    device_offline_after_seconds: int = 420
 
     @field_validator("r2_bucket", mode="before")
     @classmethod

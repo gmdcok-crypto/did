@@ -6,10 +6,13 @@ from pydantic import BaseModel
 from typing import Optional
 import uuid
 
+from datetime import datetime, timedelta
+
 from app.database import get_db
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.registration_code import get_effective_registration_auth_code
+from app.config import get_settings
 from app.sse_broadcast import (
     subscribe,
     unsubscribe,
@@ -17,9 +20,29 @@ from app.sse_broadcast import (
     broadcast_schedule_updated,
     broadcast_live_screen_request,
 )
-from datetime import datetime
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+
+
+def _effective_device_status(device: Device) -> str:
+    """
+    DB의 status는 플레이어가 /player/schedule 을 호출할 때만 online으로 갱신됨.
+    전원 OFF 시 마지막 값이 online으로 남으므로, last_seen 기준으로 오래되면 offline으로 표시.
+    """
+    settings = get_settings()
+    max_age = timedelta(seconds=max(60, settings.device_offline_after_seconds))
+    if not device.last_seen:
+        return "offline"
+    now = datetime.utcnow()
+    ls = device.last_seen
+    if getattr(ls, "tzinfo", None) is not None:
+        ls = ls.replace(tzinfo=None)
+    if now - ls > max_age:
+        return "offline"
+    st = (device.status or "").strip().lower()
+    if st in ("online", "offline", "error"):
+        return st
+    return "offline"
 
 
 class DeviceRegisterRequest(BaseModel):
@@ -135,7 +158,7 @@ async def list_devices(
             name=d.name,
             location=d.location,
             group_id=d.group_id,
-            status=d.status,
+            status=_effective_device_status(d),
             last_seen=d.last_seen.isoformat() if d.last_seen else None,
         )
         for d in devices
@@ -324,7 +347,7 @@ async def update_device(
         name=device.name,
         location=device.location,
         group_id=device.group_id,
-        status=device.status,
+        status=_effective_device_status(device),
         last_seen=device.last_seen.isoformat() if device.last_seen else None,
     )
 
