@@ -73,6 +73,11 @@ def redis_channel(device_id: str) -> str:
     return f"did:live_screen:{device_id}"
 
 
+def redis_last_frame_key(device_id: str) -> str:
+    """Pub/Sub 구독 전에 발행된 프레임은 유실되므로, 마지막 JPEG를 잠깐 저장해 늦게 붙은 CMS에도 전달."""
+    return f"did:live_screen:last:{device_id}"
+
+
 async def get_redis():
     """REDIS_URL / Settings.redis_url 이 있을 때만 클라이언트 생성."""
     global _redis
@@ -93,6 +98,8 @@ async def push_frame(device_id: str, jpeg: bytes) -> None:
     r = await get_redis()
     if r:
         try:
+            # 구독자가 없을 때 publish만 하면 CMS는 영원히 빈 화면 → last 키로 최신 1장 보존
+            await r.setex(redis_last_frame_key(device_id), 120, jpeg)
             await r.publish(redis_channel(device_id), jpeg)
             return
         except Exception as e:

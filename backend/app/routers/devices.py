@@ -14,7 +14,12 @@ from app.auth import decode_access_token
 from app.database import get_db, AsyncSessionLocal
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
-from app.live_screen_stream import get_redis, hub as live_screen_hub, redis_channel
+from app.live_screen_stream import (
+    get_redis,
+    hub as live_screen_hub,
+    redis_channel,
+    redis_last_frame_key,
+)
 from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
 from app.datetime_kst import to_kst_iso
@@ -357,6 +362,9 @@ async def ws_cms_live_screen_view(
         ch = redis_channel(did)
         await pubsub.subscribe(ch)
         try:
+            last = await r.get(redis_last_frame_key(did))
+            if last and len(last) >= 32:
+                await websocket.send_bytes(last)
             async for message in pubsub.listen():
                 if message["type"] != "message" or not message.get("data"):
                     continue
