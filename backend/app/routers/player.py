@@ -320,21 +320,39 @@ class PlayerOfflineIn(BaseModel):
     device_id: str
 
 
-@router.post("/offline")
-async def player_offline(data: PlayerOfflineIn, db: AsyncSession = Depends(get_db)):
-    """브라우저 종료·탭 닫기 시 sendBeacon 으로 호출 — 즉시 오프라인 표시(last_seen 대기 없음)."""
-    did = (data.device_id or "").strip()
+async def _mark_player_offline(db: AsyncSession, raw_device_id: str) -> bool:
+    """device_id 에 해당하면 offline 으로 두고 브로드캐스트. 없으면 False."""
+    did = (raw_device_id or "").strip()
     if not did:
-        raise HTTPException(status_code=400, detail="device_id required")
+        return False
     result = await db.execute(select(Device).where(Device.device_id == did))
     device = result.scalar_one_or_none()
     if not device:
-        return {"ok": False}
+        return False
     if device.status != "offline":
         device.status = "offline"
         await db.commit()
         broadcast_device_list_updated()
-    return {"ok": True}
+    return True
+
+
+@router.get("/offline-beacon")
+async def player_offline_beacon(device_id: str, db: AsyncSession = Depends(get_db)):
+    """sendBeacon(GET) — 모바일에서 JSON POST 비콘이 막히거나 실패할 때 사용."""
+    if not (device_id or "").strip():
+        raise HTTPException(status_code=400, detail="device_id required")
+    ok = await _mark_player_offline(db, device_id)
+    return {"ok": ok}
+
+
+@router.post("/offline")
+async def player_offline(data: PlayerOfflineIn, db: AsyncSession = Depends(get_db)):
+    """브라우저 종료·탭 닫기 시 sendBeacon(POST)·fetch 로 호출 — 즉시 오프라인 표시(last_seen 대기 없음)."""
+    did = (data.device_id or "").strip()
+    if not did:
+        raise HTTPException(status_code=400, detail="device_id required")
+    ok = await _mark_player_offline(db, did)
+    return {"ok": ok}
 
 
 class LiveScreenPollResponse(BaseModel):

@@ -267,8 +267,9 @@ export async function uploadLiveScreen(deviceId, ticket, blob) {
 }
 
 /**
- * 탭 닫기·창 종료 시 서버에 즉시 오프라인 반영(sendBeacon). F5 새로고침은 제외.
- * 전원 강제 차단·크래시 시에는 호출되지 않음 → 기존 last_seen 기반 오프라인만 해당.
+ * 탭 닫기·창 종료·백그라운드 장시간 시 서버에 오프라인 반영.
+ * - GET 비콘을 먼저 시도: 모바일 Chrome 등에서 JSON POST sendBeacon 이 실패하는 경우가 많음.
+ * - F5 새로고침은 제외. 전원 강제 차단·크래시 시에는 last_seen·서버 주기 오프라인에 의존.
  */
 export function notifyPlayerOffline(deviceId) {
   if (!deviceId || typeof window === 'undefined') return
@@ -276,11 +277,15 @@ export function notifyPlayerOffline(deviceId) {
     const nav = performance.getEntriesByType?.('navigation')?.[0]
     if (nav?.type === 'reload') return
   } catch (_) {}
-  const url = `${API_BASE}/player/offline`
+  const id = encodeURIComponent(deviceId)
+  const getUrl = `${API_BASE}/player/offline-beacon?device_id=${id}`
+  if (navigator.sendBeacon?.(getUrl)) return
+
+  const postUrl = `${API_BASE}/player/offline`
   const body = JSON.stringify({ device_id: deviceId })
   const blob = new Blob([body], { type: 'application/json' })
-  if (navigator.sendBeacon?.(url, blob)) return
-  fetch(url, {
+  if (navigator.sendBeacon?.(postUrl, blob)) return
+  fetch(postUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,

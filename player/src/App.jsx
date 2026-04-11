@@ -240,15 +240,41 @@ export default function App() {
     }
   }, [])
 
-  // 탭·창 닫을 때 서버에 즉시 오프라인 알림 (전원/강제 종료 시에는 미전송)
+  // 오프라인 알림: pagehide(데스크톱·일부 모바일) + 화면 장시간 숨김(모바일은 탭 종료 시 pagehide 가 안 오는 경우 많음)
   useEffect(() => {
     if (!deviceId) return
+    /** 짧게 다른 앱만 본 뒤 돌아오면 오프라인 처리 안 함 — 너무 짧으면 취소 */
+    const HIDDEN_OFFLINE_MS = 22000
+    let hiddenTimer = null
+    const clearHiddenTimer = () => {
+      if (hiddenTimer) {
+        clearTimeout(hiddenTimer)
+        hiddenTimer = null
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        clearHiddenTimer()
+        hiddenTimer = setTimeout(() => {
+          hiddenTimer = null
+          notifyPlayerOffline(deviceIdRef.current)
+        }, HIDDEN_OFFLINE_MS)
+      } else {
+        clearHiddenTimer()
+      }
+    }
     const onPageHide = (e) => {
       if (e.persisted) return
+      clearHiddenTimer()
       notifyPlayerOffline(deviceIdRef.current)
     }
+    document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', onPageHide)
-    return () => window.removeEventListener('pagehide', onPageHide)
+    return () => {
+      clearHiddenTimer()
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', onPageHide)
+    }
   }, [deviceId])
 
   // 자동 등록 제거: 인증코드+이름+위치 입력 후 등록 버튼으로만 등록
