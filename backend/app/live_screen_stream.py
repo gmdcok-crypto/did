@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import ssl
 from typing import Dict, List, Optional
 
 from app.config import get_settings
@@ -48,6 +49,12 @@ class LiveScreenStreamHub:
         if not lst:
             del self._subs[device_id]
 
+    def last_frame(self, device_id: str) -> Optional[bytes]:
+        b = self._last.get(device_id)
+        if b and len(b) >= 32:
+            return b
+        return None
+
     def push_frame(self, device_id: str, jpeg: bytes) -> None:
         if len(jpeg) < 32:
             return
@@ -67,6 +74,7 @@ class LiveScreenStreamHub:
 hub = LiveScreenStreamHub()
 
 _redis = None  # redis.asyncio.Redis | None
+_redis_connect_error: Optional[str] = None
 
 
 def redis_channel(device_id: str) -> str:
@@ -78,17 +86,51 @@ def redis_last_frame_key(device_id: str) -> str:
     return f"did:live_screen:last:{device_id}"
 
 
+def _redis_from_url(url: str):
+    """Railway 등 rediss:// TLS — Python 3.13+ 엄격 X509 검증 실패 시 연결 거부되는 경우가 있어 완화."""
+    if url.lower().startswith("rediss://"):
+        ctx = ssl.create_default_context()
+        try:
+            ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+        except AttributeError:
+            pass
+        return aioredis.from_url(url, decode_responses=False, ssl=ctx)
+    return aioredis.from_url(url, decode_responses=False)
+
+
 async def get_redis():
     """REDIS_URL / Settings.redis_url 이 있을 때만 클라이언트 생성."""
-    global _redis
+    global _redis, _redis_connect_error
     if aioredis is None:
         return None
     url = (get_settings().redis_url or "").strip()
     if not url:
         return None
     if _redis is None:
-        _redis = aioredis.from_url(url, decode_responses=False)
+        try:
+            _redis = _redis_from_url(url)
+            _redis_connect_error = None
+        except Exception as e:
+            _redis_connect_error = str(e)
+            logger.warning("redis client create failed: %s", e)
+            return None
     return _redis
+
+
+async def get_last_jpeg(device_id: str) -> Optional[bytes]:
+    """CMS HTTP 폴백: Redis last 키 또는 인메모리 마지막 프레임."""
+    did = (device_id or "").strip()
+    if not did:
+        return None
+    r = await get_redis()
+    if r:
+        try:
+            b = await r.get(redis_last_frame_key(did))
+            if b and len(b) >= 32:
+                return b
+        except Exception as e:
+            logger.warning("get_last_jpeg redis get: %s", e)
+    return hub.last_frame(did)
 
 
 async def check_redis_live_screen() -> dict:
@@ -112,12 +154,15 @@ async def check_redis_live_screen() -> dict:
             return {
                 "redis_configured": True,
                 "redis_ping_ok": False,
-                "detail": "client not created",
+                "detail": _redis_connect_error or "client not created",
             }
         await r.ping()
         return {"redis_configured": True, "redis_ping_ok": True, "detail": "ok"}
     except Exception as e:
-        return {"redis_configured": True, "redis_ping_ok": False, "detail": str(e)}
+        d = str(e)
+        if _redis_connect_error:
+            d = f"{d}; connect_error={_redis_connect_error}"
+        return {"redis_configured": True, "redis_ping_ok": False, "detail": d}
 
 
 async def push_frame(device_id: str, jpeg: bytes) -> None:

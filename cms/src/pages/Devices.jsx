@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { api, getToken, getLiveViewWsUrl } from '../lib/api'
+import { api, getToken, getLiveViewWsUrl, API_BASE } from '../lib/api'
 import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
@@ -30,6 +30,7 @@ export default function Devices() {
     prevBlobUrl: null,
   })
   const livePollAbortRef = useRef(0)
+  const liveStallTimerRef = useRef(null)
 
   const loadRegistrationCode = () => {
     if (user?.role !== 'admin') return
@@ -270,9 +271,11 @@ export default function Devices() {
         }
       })
     }, stallMs)
+    liveStallTimerRef.current = stallTimer
     // onopen 에서 loading 을 끄면 첫 프레임 전에 본문이 비어 "닫기"만 보임 → 첫 JPEG 수신 시에만 로딩 해제
     ws.onmessage = (ev) => {
       clearTimeout(stallTimer)
+      liveStallTimerRef.current = null
       const blob = new Blob([ev.data], { type: 'image/jpeg' })
       const url = URL.createObjectURL(blob)
       setLiveModal((m) => {
@@ -282,6 +285,7 @@ export default function Devices() {
     }
     ws.onerror = () => {
       clearTimeout(stallTimer)
+      liveStallTimerRef.current = null
       setLiveModal((m) => ({
         ...m,
         loading: false,
@@ -292,6 +296,7 @@ export default function Devices() {
     }
     ws.onclose = () => {
       clearTimeout(stallTimer)
+      liveStallTimerRef.current = null
       setLiveModal((m) => {
         if (!m.open) return m
         if (m.imageSrc) return m
@@ -305,11 +310,58 @@ export default function Devices() {
     // effect 재실행·Strict Mode 시 이미지를 지우지 않음(닫기만 보이는 현상 방지). 연결만 끊고 blob 은 closeLiveModal 에서 정리
     return () => {
       clearTimeout(stallTimer)
+      liveStallTimerRef.current = null
       try {
         ws.close()
       } catch (_) {}
     }
   }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk])
+
+  /** wss 차단·프록시 이슈 시에도 마지막 프레임을 HTTP로 폴링 */
+  useEffect(() => {
+    const open = liveModal.open
+    const ticket = liveModal.ticket
+    const pk = liveModal.liveDevicePk
+    const imageSrc = liveModal.imageSrc
+    if (!open || !ticket || pk == null || imageSrc) return
+    const token = getToken()
+    if (!token) return
+
+    let cancelled = false
+    const poll = async () => {
+      if (cancelled) return
+      try {
+        const qs = new URLSearchParams({ ticket })
+        const res = await fetch(`${API_BASE}/devices/${pk}/live-screen/frame?${qs}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        if (!res.ok || cancelled) return
+        const buf = await res.arrayBuffer()
+        if (buf.byteLength < 32 || cancelled) return
+        const blob = new Blob([buf], { type: 'image/jpeg' })
+        const url = URL.createObjectURL(blob)
+        if (liveStallTimerRef.current) {
+          clearTimeout(liveStallTimerRef.current)
+          liveStallTimerRef.current = null
+        }
+        setLiveModal((m) => {
+          if (!m.open || cancelled) {
+            URL.revokeObjectURL(url)
+            return m
+          }
+          if (m.prevBlobUrl) URL.revokeObjectURL(m.prevBlobUrl)
+          return { ...m, imageSrc: url, prevBlobUrl: url, loading: false, error: null }
+        })
+      } catch (_) {}
+    }
+    poll()
+    const t = setInterval(poll, 600)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
+  }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk, liveModal.imageSrc])
 
   const openLiveScreen = async (d) => {
     const myAbort = (livePollAbortRef.current += 1)

@@ -1,7 +1,8 @@
 import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from starlette.websockets import WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -15,6 +16,7 @@ from app.database import get_db, AsyncSessionLocal
 from app.models import Device, DeviceGroup, User, PlaybackEvent
 from app.deps import get_current_user
 from app.live_screen_stream import (
+    get_last_jpeg,
     get_redis,
     hub as live_screen_hub,
     redis_channel,
@@ -33,6 +35,8 @@ from app.sse_broadcast import (
     broadcast_live_screen_stop,
     broadcast_cms_dashboard_updated,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -327,6 +331,32 @@ async def stop_device_live_screen(
     return {"ok": True}
 
 
+@router.get("/{id}/live-screen/frame")
+async def get_live_screen_frame(
+    id: int,
+    ticket: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """WebSocket(wss)이 막혀도 동일 세션에서 마지막 JPEG를 HTTP로 받을 수 있게 함."""
+    result = await db.execute(select(Device).where(Device.id == id))
+    device = result.scalar_one_or_none()
+    if (
+        not device
+        or not device.live_screen_pending
+        or (device.live_screen_ticket or "").strip() != (ticket or "").strip()
+    ):
+        raise HTTPException(status_code=404, detail="no active live screen session")
+    raw = await get_last_jpeg(device.device_id)
+    if not raw or len(raw) < 32:
+        raise HTTPException(status_code=404, detail="no frame yet")
+    return Response(
+        content=raw,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
 @router.websocket("/ws/live-screen")
 async def ws_cms_live_screen_view(
     websocket: WebSocket,
@@ -371,8 +401,8 @@ async def ws_cms_live_screen_view(
                 await websocket.send_bytes(message["data"])
         except WebSocketDisconnect:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("cms live_screen ws (redis): %s", e)
         finally:
             try:
                 await pubsub.unsubscribe(ch)
@@ -390,8 +420,8 @@ async def ws_cms_live_screen_view(
         pass
     except WebSocketDisconnect:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("cms live_screen ws (hub): %s", e)
     finally:
         live_screen_hub.unsubscribe(did, q)
 
