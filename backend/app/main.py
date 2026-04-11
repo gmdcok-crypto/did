@@ -333,6 +333,18 @@ async def setup_database_public():
     return await run_ensure_seed()
 
 
+@app.get("/api/ready", include_in_schema=False)
+def api_ready():
+    """배포 진단: Docker에 player_dist/cms_dist가 들어왔는지(플레이어가 안 나올 때 확인)."""
+    return {
+        "ok": True,
+        "player_spa": SERVE_PLAYER,
+        "cms_spa": SERVE_CMS,
+        "upload_dir": settings.upload_dir,
+        "upload_dir_exists": os.path.isdir(settings.upload_dir),
+    }
+
+
 if SERVE_PLAYER:
     @app.get("/{full_path:path}")
     def serve_player_spa(full_path: str):

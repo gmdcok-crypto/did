@@ -61,9 +61,15 @@ export function scheduleCacheStorageKey(deviceId) {
 
 export function saveScheduleToStorage(deviceId, data) {
   if (!deviceId || !data || typeof sessionStorage === 'undefined') return
-  const wrapped = { ...data, [CACHE_DEVICE_FIELD]: String(deviceId).trim() }
+  let s
+  try {
+    const wrapped = { ...data, [CACHE_DEVICE_FIELD]: String(deviceId).trim() }
+    s = JSON.stringify(wrapped)
+  } catch (e) {
+    console.warn('[DID player] 스케줄 캐시 직렬화 실패(재생은 계속됨):', e)
+    return
+  }
   const key = scheduleCacheStorageKey(deviceId)
-  const s = JSON.stringify(wrapped)
   try {
     sessionStorage.setItem(key, s)
   } catch (_) {}
