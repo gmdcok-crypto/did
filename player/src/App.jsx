@@ -10,6 +10,7 @@ import {
   getMediaBaseUrl,
   pollLiveScreenCapture,
   uploadLiveScreen,
+  notifyPlayerOffline,
   DEVICE_NOT_FOUND,
   purgePlayerScheduleCaches,
 } from './lib/api'
@@ -151,6 +152,17 @@ export default function App() {
       window.history.replaceState({}, '', url.pathname + url.search)
     }
   }, [])
+
+  // 탭·창 닫을 때 서버에 즉시 오프라인 알림 (전원/강제 종료 시에는 미전송)
+  useEffect(() => {
+    if (!deviceId) return
+    const onPageHide = (e) => {
+      if (e.persisted) return
+      notifyPlayerOffline(deviceIdRef.current)
+    }
+    window.addEventListener('pagehide', onPageHide)
+    return () => window.removeEventListener('pagehide', onPageHide)
+  }, [deviceId])
 
   // 자동 등록 제거: 인증코드+이름+위치 입력 후 등록 버튼으로만 등록
 

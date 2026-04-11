@@ -258,6 +258,27 @@ async def get_schedule(
     )
 
 
+class PlayerOfflineIn(BaseModel):
+    device_id: str
+
+
+@router.post("/offline")
+async def player_offline(data: PlayerOfflineIn, db: AsyncSession = Depends(get_db)):
+    """브라우저 종료·탭 닫기 시 sendBeacon 으로 호출 — 즉시 오프라인 표시(last_seen 대기 없음)."""
+    did = (data.device_id or "").strip()
+    if not did:
+        raise HTTPException(status_code=400, detail="device_id required")
+    result = await db.execute(select(Device).where(Device.device_id == did))
+    device = result.scalar_one_or_none()
+    if not device:
+        return {"ok": False}
+    if device.status != "offline":
+        device.status = "offline"
+        await db.commit()
+        broadcast_device_list_updated()
+    return {"ok": True}
+
+
 class LiveScreenPollResponse(BaseModel):
     capture: bool
     ticket: Optional[str] = None

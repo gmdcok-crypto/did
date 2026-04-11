@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:8000/api')
+export const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:8000/api')
 
 /** 미디어(/uploads/...) 요청용 백엔드 주소. 상대 경로일 때 이미지가 나오도록 함 */
 export function getMediaBaseUrl() {
@@ -137,6 +137,29 @@ export async function uploadLiveScreen(deviceId, ticket, blob) {
     delay = Math.min(delay * 2, 2000)
   }
   return false
+}
+
+/**
+ * 탭 닫기·창 종료 시 서버에 즉시 오프라인 반영(sendBeacon). F5 새로고침은 제외.
+ * 전원 강제 차단·크래시 시에는 호출되지 않음 → 기존 last_seen 기반 오프라인만 해당.
+ */
+export function notifyPlayerOffline(deviceId) {
+  if (!deviceId || typeof window === 'undefined') return
+  try {
+    const nav = performance.getEntriesByType?.('navigation')?.[0]
+    if (nav?.type === 'reload') return
+  } catch (_) {}
+  const url = `${API_BASE}/player/offline`
+  const body = JSON.stringify({ device_id: deviceId })
+  const blob = new Blob([body], { type: 'application/json' })
+  if (navigator.sendBeacon?.(url, blob)) return
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+    cache: 'no-store',
+  }).catch(() => {})
 }
 
 export async function sendEvents(deviceId, events) {
