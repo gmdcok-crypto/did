@@ -154,6 +154,12 @@ body {
   height: 100%;
 }
 
+/* full_portrait: 9:16 존에 비율 무시하고 늘려 꽉 채움(왜곡 허용) — contain/cover 대신 fill */
+.player-portrait-frame-inner .media.media-video,
+.player-portrait-frame-inner .media.media-image {
+  object-fit: fill;
+}
+
 .zone {
   position: relative;
   overflow: hidden;
