@@ -8,7 +8,7 @@ const TABS = [
 ]
 
 const LAYOUT_OPTIONS = [
-  { value: 'full', label: '전체(full)' },
+  { value: 'full', label: '전체화면(가로)' },
   { value: 'full_portrait', label: '전체화면(세로)(full_portrait)' },
   { value: 'split_h', label: '가로 분할(split_h)' },
   { value: 'split_v', label: '세로 분할(split_v)' },
