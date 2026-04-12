@@ -1055,32 +1055,6 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   flex: 0 0 auto;
 }
 
-/*
- * 세로 모달: 프레임(9:16 박스·마진)은 그대로 — 미디어만 스트림 사각형을 꽉 채움.
- * .live-screen-zone--portrait / object-fit:contain 규칙보다 특이도 높게 덮어씀.
- */
-.live-screen-modal--portrait .live-screen-zone--portrait {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.live-screen-modal--portrait .live-screen-zone .live-screen-zone-media {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  display: block;
-}
-
-.live-screen-modal--portrait .live-screen-zone-html {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  border: none;
-}
-
 .live-screen-modal-stream-empty {
   padding: 2rem 1.25rem;
   color: var(--text-muted);
@@ -1124,6 +1098,40 @@ input.campaign-add-datetime::-moz-calendar-picker-indicator {
   height: 100%;
   object-fit: contain;
   background: #000;
+}
+
+/*
+ * 세로 모달(full_portrait): 스트림·마진·aspect-ratio 는 위 규칙 그대로.
+ * 미디어만 스트림 사각형에 cover — 이 블록은 .live-screen-zone-media(contain) 보다 아래에 둠.
+ */
+.live-screen-modal--portrait .live-screen-portrait-outer .live-screen-modal-stream > .live-screen-zone {
+  width: 100%;
+  height: 100%;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.live-screen-modal--portrait .live-screen-portrait-outer .live-screen-zone--portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.live-screen-modal--portrait .live-screen-portrait-outer .live-screen-zone .live-screen-zone-media {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.live-screen-modal--portrait .live-screen-portrait-outer .live-screen-zone-html {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: none;
 }
 
 .live-screen-zone-html {
