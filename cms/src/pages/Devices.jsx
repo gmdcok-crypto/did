@@ -35,7 +35,14 @@ function LiveStreamManifestView({ manifest }) {
     streamStyle.minHeight = 'min(70vh, 520px)'
   }
   const stream = (
-    <div className="live-screen-modal-stream" style={streamStyle}>
+    <div
+      className={
+        portraitFull
+          ? 'live-screen-modal-stream live-screen-modal-stream--portrait-fill'
+          : 'live-screen-modal-stream'
+      }
+      style={streamStyle}
+    >
       {zones.map((z) => (
         <div
           key={String(z.id)}
@@ -45,7 +52,7 @@ function LiveStreamManifestView({ manifest }) {
               : 'live-screen-zone'
           }
         >
-          <LiveZoneMedia current={z.current} />
+          <LiveZoneMedia current={z.current} fillFrame={portraitFull} />
         </div>
       ))}
     </div>
@@ -137,15 +144,19 @@ function buildLiveScreenStallMessage(d) {
   return lines.join('\n')
 }
 
-function LiveZoneMedia({ current }) {
+function LiveZoneMedia({ current, fillFrame = false }) {
   if (!current?.url) {
     return <div className="live-screen-zone-placeholder">대기 중</div>
   }
   const { type, url } = current
+  const mediaFillStyle = fillFrame
+    ? { objectFit: 'cover', width: '100%', height: '100%', maxWidth: 'none' }
+    : undefined
   if (type === 'video') {
     return (
       <video
         className="live-screen-zone-media"
+        style={mediaFillStyle}
         src={url}
         autoPlay
         muted
@@ -155,7 +166,15 @@ function LiveZoneMedia({ current }) {
     )
   }
   if (type === 'image') {
-    return <img className="live-screen-zone-media" src={url} alt="" decoding="async" />
+    return (
+      <img
+        className="live-screen-zone-media"
+        style={mediaFillStyle}
+        src={url}
+        alt=""
+        decoding="async"
+      />
+    )
   }
   if (type === 'html') {
     return <iframe className="live-screen-zone-html" src={url} title="" />
