@@ -667,9 +667,6 @@ export default function Devices() {
   return (
     <div className="page">
       <h1>디바이스</h1>
-      <p className="small" style={{ color: '#666', marginBottom: '1rem' }}>
-        마지막 접속 시각은 한국 표준시(KST)로 표시됩니다.
-      </p>
 
       <div className="devices-top-row">
         {user?.role === 'admin' && (
