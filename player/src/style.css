@@ -129,10 +129,28 @@ body {
   z-index: 0;
 }
 
-/* full_portrait: 일반 존과 동일하게 화면 전체(inset:0) — 미디어만 fill(왜곡 허용) */
+/* full_portrait: 틀·라운드 없이 미디어만 전체(가로와 동일하게 보이게) */
+.player-zones--full-portrait .zone {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: #000;
+}
+
+.player-zones--full-portrait .media-wrap {
+  border-radius: 0;
+}
+
 .player-zones--full-portrait .media.media-video,
 .player-zones--full-portrait .media.media-image {
   object-fit: fill;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.player-zones--full-portrait .media-html {
+  border-radius: 0;
 }
 
 .zone {
