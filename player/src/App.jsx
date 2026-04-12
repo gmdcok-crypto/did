@@ -761,59 +761,37 @@ export default function App() {
           </a>
         </div>
       )}
-      {schedule?.layout_id === 'full_portrait' ? (
-        <div className="player-portrait-frame">
-          <div className="player-portrait-frame-inner">
-            <div
-              ref={zonesRef}
-              className="player-zones"
-              style={{
-                display: 'grid',
+      <div
+        ref={zonesRef}
+        className={
+          schedule?.layout_id === 'full_portrait'
+            ? 'player-zones player-zones--full-portrait'
+            : 'player-zones'
+        }
+        style={{
+          display: 'grid',
+          // minmax(0, fr) — 그리드 자식 min-width:auto 때문에 존 너비·높이 0으로 붕괴해 검은 화면만 나오는 현상 방지
+          ...(schedule?.layout_id === 'split_v'
+            ? {
+                gridTemplateRows: zones.map((z) => `minmax(0,${zoneRatio(z) * 100}fr)`).join(' '),
+                gridTemplateColumns: 'minmax(0,1fr)',
+              }
+            : {
                 gridTemplateColumns: zones.map((z) => `minmax(0,${zoneRatio(z) * 100}fr)`).join(' '),
-                gap: 0,
-              }}
-            >
-              {(zones || []).filter((z) => z != null && typeof z === 'object').map((zone, zi) => (
-                <Zone
-                  key={zone.id != null ? String(zone.id) : `zone-${zi}`}
-                  zone={zone}
-                  reportEvent={reportEvent}
-                  mediaBaseUrl={getMediaBaseUrl()}
-                  onLiveZoneMedia={onLiveZoneMedia}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div
-          ref={zonesRef}
-          className="player-zones"
-          style={{
-            display: 'grid',
-            // minmax(0, fr) — 그리드 자식 min-width:auto 때문에 존 너비·높이 0으로 붕괴해 검은 화면만 나오는 현상 방지
-            ...(schedule?.layout_id === 'split_v'
-              ? {
-                  gridTemplateRows: zones.map((z) => `minmax(0,${zoneRatio(z) * 100}fr)`).join(' '),
-                  gridTemplateColumns: 'minmax(0,1fr)',
-                }
-              : {
-                  gridTemplateColumns: zones.map((z) => `minmax(0,${zoneRatio(z) * 100}fr)`).join(' '),
-                }),
-            gap: 0,
-          }}
-        >
-          {(zones || []).filter((z) => z != null && typeof z === 'object').map((zone, zi) => (
-            <Zone
-              key={zone.id != null ? String(zone.id) : `zone-${zi}`}
-              zone={zone}
-              reportEvent={reportEvent}
-              mediaBaseUrl={getMediaBaseUrl()}
-              onLiveZoneMedia={onLiveZoneMedia}
-            />
-          ))}
-        </div>
-      )}
+              }),
+          gap: 0,
+        }}
+      >
+        {(zones || []).filter((z) => z != null && typeof z === 'object').map((zone, zi) => (
+          <Zone
+            key={zone.id != null ? String(zone.id) : `zone-${zi}`}
+            zone={zone}
+            reportEvent={reportEvent}
+            mediaBaseUrl={getMediaBaseUrl()}
+            onLiveZoneMedia={onLiveZoneMedia}
+          />
+        ))}
+      </div>
     </div>
     <DebugHud deviceId={deviceId} schedule={schedule} error={error} online={online} />
     <DeviceIdStrip deviceId={deviceId} schedule={schedule} />
