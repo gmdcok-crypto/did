@@ -11,7 +11,7 @@ from starlette.responses import Response
 from sqlalchemy import text, select
 from app.database import engine, Base, AsyncSessionLocal
 from app.config import get_settings
-from app.routers import auth, devices, player, events, contents, campaigns, schedules, settings as settings_router
+from app.routers import auth, devices, player, events, contents, campaigns, schedules, settings as settings_router, deployment_registry
 from app.models import User
 from app.auth import get_password_hash
 from app.stale_device_broadcaster import run_stale_device_broadcaster
@@ -266,6 +266,7 @@ app.include_router(contents.router, prefix="/api")
 app.include_router(campaigns.router, prefix="/api")
 app.include_router(schedules.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
+app.include_router(deployment_registry.router, prefix="/api")
 
 settings = get_settings()
 os.makedirs(settings.upload_dir, exist_ok=True)

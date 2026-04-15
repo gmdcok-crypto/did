@@ -7,6 +7,7 @@ from app.models.content import Content  # noqa
 from app.models.schedule import Schedule, ScheduleSlot  # noqa
 from app.models.event import PlaybackEvent  # noqa
 from app.models.app_setting import AppSetting  # noqa
+from app.models.deployment_record import DeploymentRecord  # noqa
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "ScheduleSlot",
     "PlaybackEvent",
     "AppSetting",
+    "DeploymentRecord",
 ]
