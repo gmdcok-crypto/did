@@ -27,6 +27,11 @@ const EVENT_QUEUE_KEY = 'did_event_queue'
 /** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
 const IMAGE_FADE_MS = 550
 
+/** PC 브라우저에서 디코더가 멈춘 뒤 네트워크만 진행되는 경우 완화 — 과도한 재시도 방지 */
+const VIDEO_STALL_RECOVER_MS = 4000
+const VIDEO_FREEZE_CHECK_MS = 5000
+const MAX_VIDEO_SOFT_RECOVERY = 8
+
 /** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
 const _mediaLoadErrLogged = new Set()
 function logMediaLoadFailure(kind, contentId, url) {
@@ -984,10 +989,40 @@ function parseContentIdForEvents(id) {
 function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, onIntrinsicSize }) {
   const hasReported = useRef(false)
   const videoRef = useRef(null)
+  const videoStallTimerRef = useRef(null)
+  const videoWatchdogRef = useRef(null)
+  const videoFreezeSnapRef = useRef(null)
+  const videoRecoveryCountRef = useRef(0)
+  const videoErrorRecoverOnceRef = useRef(false)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
   const mediaCrossOrigin = crossOriginForMediaUrl(url)
   const contentIdInt = parseContentIdForEvents(item?.id)
   const logId = item?.id ?? item?.url ?? ''
+
+  const clearVideoStallTimer = useCallback(() => {
+    if (videoStallTimerRef.current != null) {
+      clearTimeout(videoStallTimerRef.current)
+      videoStallTimerRef.current = null
+    }
+  }, [])
+
+  const recoverVideoSoft = useCallback(() => {
+    const el = videoRef.current
+    if (!el || !url) return
+    if (videoRecoveryCountRef.current >= MAX_VIDEO_SOFT_RECOVERY) return
+    videoRecoveryCountRef.current += 1
+    try {
+      const u = url
+      el.pause()
+      el.removeAttribute('src')
+      el.load()
+      if (mediaCrossOrigin) el.crossOrigin = mediaCrossOrigin
+      else el.removeAttribute('crossOrigin')
+      el.src = u
+      el.load()
+      el.play().catch(() => {})
+    } catch (_) {}
+  }, [url, mediaCrossOrigin])
 
   useEffect(() => {
     if (contentIdInt == null) return
@@ -1010,6 +1045,41 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
     el.addEventListener('canplay', tryPlay)
     return () => el.removeEventListener('canplay', tryPlay)
   }, [item?.type, url])
+
+  /** 재생 중 currentTime이 오래 멈춰 있으면(디코더 멈춤 추정) 소프트 리로드 */
+  useEffect(() => {
+    if (item?.type !== 'video' || !url) return
+    videoRecoveryCountRef.current = 0
+    videoErrorRecoverOnceRef.current = false
+    videoFreezeSnapRef.current = null
+    videoWatchdogRef.current = window.setInterval(() => {
+      const v = videoRef.current
+      if (!v || v.paused || v.ended) {
+        videoFreezeSnapRef.current = null
+        return
+      }
+      if (v.readyState < 2) return
+      const t = v.currentTime
+      const snap = videoFreezeSnapRef.current
+      if (snap != null && Math.abs(t - snap.t) < 0.03) {
+        recoverVideoSoft()
+        videoFreezeSnapRef.current = null
+      } else {
+        videoFreezeSnapRef.current = { t }
+      }
+    }, VIDEO_FREEZE_CHECK_MS)
+    return () => {
+      if (videoWatchdogRef.current != null) {
+        clearInterval(videoWatchdogRef.current)
+        videoWatchdogRef.current = null
+      }
+      videoFreezeSnapRef.current = null
+    }
+  }, [item?.type, url, recoverVideoSoft])
+
+  useEffect(() => {
+    return () => clearVideoStallTimer()
+  }, [clearVideoStallTimer])
 
   const reportIntrinsic = useCallback(
     (w, h) => {
@@ -1050,10 +1120,33 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
         }}
         onCanPlay={() => onReady?.()}
         onLoadedData={() => onReady?.()}
-        onPlay={() => onReady?.()}
+        onPlay={() => {
+          clearVideoStallTimer()
+          onReady?.()
+        }}
+        onPlaying={() => clearVideoStallTimer()}
+        onTimeUpdate={() => clearVideoStallTimer()}
+        onWaiting={() => clearVideoStallTimer()}
+        onStalled={() => {
+          clearVideoStallTimer()
+          videoStallTimerRef.current = window.setTimeout(() => {
+            videoStallTimerRef.current = null
+            const v = videoRef.current
+            if (!v || v.paused || v.ended) return
+            recoverVideoSoft()
+          }, VIDEO_STALL_RECOVER_MS)
+        }}
         onEnded={() => onVideoEnded?.()}
         onError={() => {
           if (contentIdInt != null) reportEvent(contentIdInt, 'error')
+          if (
+            !videoErrorRecoverOnceRef.current &&
+            videoRecoveryCountRef.current < MAX_VIDEO_SOFT_RECOVERY
+          ) {
+            videoErrorRecoverOnceRef.current = true
+            recoverVideoSoft()
+            return
+          }
           onVideoEnded?.()
         }}
       />
