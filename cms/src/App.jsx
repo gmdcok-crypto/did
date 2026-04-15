@@ -7,7 +7,6 @@ import Campaigns from './pages/Campaigns'
 import Contents from './pages/Contents'
 import Schedules from './pages/Schedules'
 import Devices from './pages/Devices'
-import DeploymentRegistry from './pages/DeploymentRegistry'
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth()
@@ -34,7 +33,6 @@ export default function App() {
         <Route path="contents" element={<Contents />} />
         <Route path="schedules" element={<Schedules />} />
         <Route path="devices" element={<Devices />} />
-        <Route path="deployments" element={<DeploymentRegistry />} />
       </Route>
     </Routes>
   )

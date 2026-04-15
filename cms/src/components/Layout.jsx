@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 
-const navBase = [
+const nav = [
   { to: '/dashboard', label: '대시보드' },
   { to: '/contents', label: '미디어' },
   { to: '/campaigns', label: '캠페인' },
@@ -12,10 +12,6 @@ const navBase = [
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const nav =
-    user?.role === 'admin'
-      ? [...navBase, { to: '/deployments', label: '배포 관리' }]
-      : navBase
 
   const handleLogout = () => {
     logout()
