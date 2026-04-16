@@ -350,36 +350,6 @@ body {
 }
 
 /* Player settings */
-/* 전체화면 (좌측 상단 — 우측 ⚙ 설정과 겹치지 않음) */
-.player-fullscreen-btn {
-  position: fixed;
-  top: 8px;
-  left: 8px;
-  z-index: 21;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.player-fullscreen-btn:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
-
-.player-fullscreen-btn.is-active {
-  border-color: rgba(74, 222, 128, 0.6);
-  background: rgba(0, 0, 0, 0.65);
-}
-
 .player-settings-wrap {
   position: fixed;
   top: 8px;
