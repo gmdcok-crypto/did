@@ -11,6 +11,7 @@ class DeviceGroup(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), index=True)
+    orientation: Mapped[str] = mapped_column(String(20), default="landscape")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     devices: Mapped[list["Device"]] = relationship("Device", back_populates="group")

@@ -14,6 +14,30 @@ const LAYOUT_OPTIONS = [
   { value: 'split_v', label: '세로 분할(split_v)' },
 ]
 
+const ORIENTATION_LAYOUTS = {
+  landscape: ['full', 'split_h'],
+  portrait: ['full_portrait', 'split_v'],
+}
+
+function getGroupOrientationLabel(orientation) {
+  return orientation === 'portrait' ? '세로형' : '가로형'
+}
+
+function getAllowedLayoutsForOrientation(orientation) {
+  if (!orientation) return LAYOUT_OPTIONS.map((opt) => opt.value)
+  return ORIENTATION_LAYOUTS[orientation] || ORIENTATION_LAYOUTS.landscape
+}
+
+function isLayoutAllowedForOrientation(layoutId, orientation) {
+  return getAllowedLayoutsForOrientation(orientation).includes(layoutId || 'full')
+}
+
+function normalizeLayoutForOrientation(layoutId, orientation) {
+  if (!orientation) return layoutId || 'full'
+  const allowed = getAllowedLayoutsForOrientation(orientation)
+  return allowed.includes(layoutId) ? layoutId : allowed[0]
+}
+
 function isFullScreenLayout(layoutId) {
   return layoutId === 'full' || layoutId === 'full_portrait'
 }
@@ -51,6 +75,20 @@ export default function Schedules() {
       return { content_ids: [] }
     }
     return null
+  }
+
+  const getGroupOrientation = (groupId) => {
+    if (!groupId) return null
+    const group = groups.find((g) => String(g.id) === String(groupId))
+    return group?.orientation || null
+  }
+
+  const getCompatibleLayoutConfig = (nextLayoutId, prevLayoutId, prevConfig) => {
+    if (isFullScreenLayout(nextLayoutId) && isFullScreenLayout(prevLayoutId)) {
+      return { content_ids: prevConfig?.content_ids || [] }
+    }
+    return defaultZoneConfig(nextLayoutId) ||
+      (isFullScreenLayout(nextLayoutId) ? { content_ids: prevConfig?.content_ids || [] } : prevConfig)
   }
 
   const loadCampaignContentIds = (campaignId) => {
@@ -123,6 +161,11 @@ export default function Schedules() {
       alert('캠페인과 디바이스 그룹을 선택하세요.')
       return
     }
+    const groupOrientation = getGroupOrientation(gid)
+    if (!isLayoutAllowedForOrientation(layout_id || 'full', groupOrientation)) {
+      alert(`선택한 디바이스 그룹은 ${getGroupOrientationLabel(groupOrientation)}입니다. 레이아웃을 다시 선택하세요.`)
+      return
+    }
     setSubmitting(true)
     try {
       await api('/schedules', {
@@ -152,7 +195,8 @@ export default function Schedules() {
 
   const startEdit = (s) => {
     setEditingId(s.id)
-    const layoutId = s.layout_id || 'full'
+    const groupOrientation = getGroupOrientation(s.device_group_id)
+    const layoutId = normalizeLayoutForOrientation(s.layout_id || 'full', groupOrientation)
     let initialConfig = s.layout_config || defaultZoneConfig(layoutId)
     if (isFullScreenLayout(layoutId) && (!initialConfig?.content_ids || initialConfig.content_ids.length === 0)) {
       loadCampaignContentIds(s.campaign_id).then((ids) => {
@@ -198,6 +242,11 @@ export default function Schedules() {
       alert('캠페인과 디바이스 그룹을 선택하세요.')
       return
     }
+    const groupOrientation = getGroupOrientation(gid)
+    if (!isLayoutAllowedForOrientation(layout_id || 'full', groupOrientation)) {
+      alert(`선택한 디바이스 그룹은 ${getGroupOrientationLabel(groupOrientation)}입니다. 레이아웃을 다시 선택하세요.`)
+      return
+    }
     try {
       await api(`/schedules/${editingId}`, {
         method: 'PATCH',
@@ -233,6 +282,9 @@ export default function Schedules() {
   }
 
   if (loading && list.length === 0) return <div className="loading">로딩 중...</div>
+
+  const selectedAddGroupOrientation = getGroupOrientation(addForm.device_group_id)
+  const selectedEditGroupOrientation = getGroupOrientation(editForm.device_group_id)
 
   return (
     <div className="page">
@@ -312,11 +364,23 @@ export default function Schedules() {
                               <select
                                 className="input-sm"
                                 value={editForm.device_group_id}
-                                onChange={(e) => setEditForm((f) => ({ ...f, device_group_id: e.target.value }))}
+                                onChange={(e) => {
+                                  const gid = e.target.value
+                                  const nextOrientation = getGroupOrientation(gid)
+                                  setEditForm((f) => {
+                                    const nextLayout = normalizeLayoutForOrientation(f.layout_id || 'full', nextOrientation)
+                                    return {
+                                      ...f,
+                                      device_group_id: gid,
+                                      layout_id: nextLayout,
+                                      layout_config: getCompatibleLayoutConfig(nextLayout, f.layout_id || 'full', f.layout_config),
+                                    }
+                                  })
+                                }}
                               >
                                 <option value="">선택</option>
                                 {groups.map((g) => (
-                                  <option key={g.id} value={g.id}>{g.name}</option>
+                                  <option key={g.id} value={g.id}>{g.name} ({getGroupOrientationLabel(g.orientation)})</option>
                                 ))}
                               </select>
                             </td>
@@ -329,16 +393,11 @@ export default function Schedules() {
                                       name={`layout_edit_${s.id}`}
                                       value={opt.value}
                                       checked={(editForm.layout_id || 'full') === opt.value}
+                                      disabled={!isLayoutAllowedForOrientation(opt.value, selectedEditGroupOrientation)}
                                       onChange={() => {
                                         const v = opt.value
                                         const prevLayout = editForm.layout_id
-                                        const nextConfig =
-                                          isFullScreenLayout(v) && isFullScreenLayout(prevLayout)
-                                            ? { content_ids: editForm.layout_config?.content_ids || [] }
-                                            : defaultZoneConfig(v) ||
-                                              (isFullScreenLayout(v)
-                                                ? { content_ids: editForm.layout_config?.content_ids || [] }
-                                                : editForm.layout_config)
+                                        const nextConfig = getCompatibleLayoutConfig(v, prevLayout, editForm.layout_config)
                                         setEditForm((f) => ({ ...f, layout_id: v, layout_config: nextConfig }))
                                         if (
                                           isFullScreenLayout(v) &&
@@ -510,12 +569,32 @@ export default function Schedules() {
                   <label>디바이스 그룹</label>
                   <select
                     value={addForm.device_group_id}
-                    onChange={(e) => setAddForm((f) => ({ ...f, device_group_id: e.target.value }))}
+                    onChange={(e) => {
+                      const gid = e.target.value
+                      const nextOrientation = getGroupOrientation(gid)
+                      setAddForm((f) => {
+                        const nextLayout = normalizeLayoutForOrientation(f.layout_id || 'full', nextOrientation)
+                        return {
+                          ...f,
+                          device_group_id: gid,
+                          layout_id: nextLayout,
+                          layout_config: getCompatibleLayoutConfig(nextLayout, f.layout_id || 'full', f.layout_config),
+                        }
+                      })
+                      if (addForm.campaign_id) {
+                        const nextLayout = normalizeLayoutForOrientation(addForm.layout_id || 'full', nextOrientation)
+                        if (isFullScreenLayout(nextLayout)) {
+                          loadCampaignContentIds(addForm.campaign_id).then((ids) => {
+                            setAddForm((f) => ({ ...f, layout_config: { ...(f.layout_config || {}), content_ids: ids } }))
+                          })
+                        }
+                      }
+                    }}
                   >
                     <option value="">선택</option>
                     {groups.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.name} (ID: {g.id})
+                        {g.name} ({getGroupOrientationLabel(g.orientation)}) (ID: {g.id})
                       </option>
                     ))}
                   </select>
@@ -530,14 +609,11 @@ export default function Schedules() {
                           name="layout_id_add"
                           value={opt.value}
                           checked={(addForm.layout_id || 'full') === opt.value}
+                          disabled={!isLayoutAllowedForOrientation(opt.value, selectedAddGroupOrientation)}
                           onChange={() => {
                             const v = opt.value
                             const prevLayout = addForm.layout_id || 'full'
-                            const nextConfig =
-                              isFullScreenLayout(v) && isFullScreenLayout(prevLayout)
-                                ? { content_ids: addForm.layout_config?.content_ids || [] }
-                                : defaultZoneConfig(v) ||
-                                  (isFullScreenLayout(v) ? { content_ids: addForm.layout_config?.content_ids || [] } : null)
+                            const nextConfig = getCompatibleLayoutConfig(v, prevLayout, addForm.layout_config)
                             setAddForm((f) => ({ ...f, layout_id: v, layout_config: nextConfig }))
                             if (isFullScreenLayout(v) && addForm.campaign_id) {
                               loadCampaignContentIds(addForm.campaign_id).then((ids) => {

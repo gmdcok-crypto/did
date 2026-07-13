@@ -4,6 +4,15 @@ import { subscribeCmsDeviceEvents, CMS_SSE_DEVICE_LIST, CMS_SSE_DASHBOARD } from
 import { formatKstDateTime } from '../lib/datetimeKst'
 import { useAuth } from '../lib/auth'
 
+const GROUP_ORIENTATION_OPTIONS = [
+  { value: 'landscape', label: '가로형' },
+  { value: 'portrait', label: '세로형' },
+]
+
+function getGroupOrientationLabel(orientation) {
+  return orientation === 'portrait' ? '세로형' : '가로형'
+}
+
 /** 플레이어가 보낸 JSON 매니페스트(재생 URL) — 캡처 없음 */
 function LiveStreamManifestView({ manifest }) {
   const layout = manifest?.layout_id || 'full'
@@ -171,6 +180,7 @@ export default function Devices() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ name: '', location: '', group_id: '' })
   const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupOrientation, setNewGroupOrientation] = useState('landscape')
   const [selectedGroupId, setSelectedGroupId] = useState(null)
   const [regAuthCode, setRegAuthCode] = useState('')
   const [regUsesDatabase, setRegUsesDatabase] = useState(false)
@@ -281,6 +291,7 @@ export default function Devices() {
     if (selectedGroupId != null && !groups.some((g) => g.id === selectedGroupId)) {
       setSelectedGroupId(null)
       setNewGroupName('')
+      setNewGroupOrientation('landscape')
     }
   }, [groups, selectedGroupId])
 
@@ -350,9 +361,10 @@ export default function Devices() {
     try {
       await api('/devices/groups', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, orientation: newGroupOrientation }),
       })
       setNewGroupName('')
+      setNewGroupOrientation('landscape')
       setSelectedGroupId(null)
       load()
     } catch (e) {
@@ -370,7 +382,7 @@ export default function Devices() {
     try {
       await api(`/devices/groups/${selectedGroupId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, orientation: newGroupOrientation }),
       })
       load()
     } catch (e) {
@@ -390,6 +402,7 @@ export default function Devices() {
       await api(`/devices/groups/${selectedGroupId}`, { method: 'DELETE' })
       setSelectedGroupId(null)
       setNewGroupName('')
+      setNewGroupOrientation('landscape')
       load()
     } catch (e) {
       alert(e.message)
@@ -704,6 +717,17 @@ export default function Devices() {
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
             />
+            <select
+              className="input-sm devices-groups-toolbar-input"
+              value={newGroupOrientation}
+              onChange={(e) => setNewGroupOrientation(e.target.value)}
+            >
+              {GROUP_ORIENTATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <button type="submit" className="btn btn-sm">
               추가
             </button>
@@ -724,16 +748,20 @@ export default function Devices() {
                 onClick={() => {
                   setSelectedGroupId(g.id)
                   setNewGroupName(g.name)
+                  setNewGroupOrientation(g.orientation || 'landscape')
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     setSelectedGroupId(g.id)
                     setNewGroupName(g.name)
+                    setNewGroupOrientation(g.orientation || 'landscape')
                   }
                 }}
               >
-                <span className="group-name">{g.name}</span>
+                <span className="group-name">
+                  {g.name} <span className="small">({getGroupOrientationLabel(g.orientation)})</span>
+                </span>
                 <span className="group-id">ID: {g.id}</span>
               </li>
             ))}

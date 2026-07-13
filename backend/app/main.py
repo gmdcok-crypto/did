@@ -116,6 +116,46 @@ async def init_db():
 
             await conn.run_sync(add_device_live_screen_cols_mysql)
 
+        def ensure_device_group_orientation(sync_conn):
+            from sqlalchemy import inspect
+
+            try:
+                columns = {col["name"] for col in inspect(sync_conn).get_columns("device_groups")}
+            except Exception:
+                columns = set()
+            if "orientation" not in columns:
+                dialect = engine.dialect.name
+                if dialect == "sqlite":
+                    stmt = (
+                        "ALTER TABLE device_groups "
+                        "ADD COLUMN orientation VARCHAR(20) NOT NULL DEFAULT 'landscape'"
+                    )
+                elif dialect in ("mysql", "mariadb"):
+                    stmt = (
+                        "ALTER TABLE device_groups "
+                        "ADD COLUMN orientation VARCHAR(20) NOT NULL DEFAULT 'landscape'"
+                    )
+                else:
+                    stmt = (
+                        "ALTER TABLE device_groups "
+                        "ADD COLUMN orientation VARCHAR(20) DEFAULT 'landscape'"
+                    )
+                try:
+                    sync_conn.execute(text(stmt))
+                except Exception:
+                    pass
+            try:
+                sync_conn.execute(
+                    text(
+                        "UPDATE device_groups SET orientation = 'landscape' "
+                        "WHERE orientation IS NULL OR TRIM(orientation) = ''"
+                    )
+                )
+            except Exception:
+                pass
+
+        await conn.run_sync(ensure_device_group_orientation)
+
 async def _log_live_screen_redis_status() -> None:
     """기동 직후 Redis 실시간 화면 설정 여부를 한 번 로그 (진단용)."""
     await asyncio.sleep(3.0)

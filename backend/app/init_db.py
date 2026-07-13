@@ -25,7 +25,7 @@ async def main():
 
         r = await db.execute(select(DeviceGroup).where(DeviceGroup.name == "기본"))
         if r.scalar_one_or_none() is None:
-            g = DeviceGroup(name="기본")
+            g = DeviceGroup(name="기본", orientation="landscape")
             db.add(g)
             await db.commit()
             print("Created device group: 기본")

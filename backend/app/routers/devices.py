@@ -30,6 +30,7 @@ from app.registration_code import get_effective_registration_auth_code
 from app.config import get_settings
 from app.datetime_kst import to_kst_iso
 from app.device_time import is_last_seen_stale
+from app.layout_rules import is_layout_allowed_for_orientation, normalize_group_orientation
 from app.sse_broadcast import (
     subscribe,
     unsubscribe,
@@ -229,11 +230,12 @@ async def list_groups(
 ):
     result = await db.execute(select(DeviceGroup).order_by(DeviceGroup.id))
     groups = result.scalars().all()
-    return [{"id": g.id, "name": g.name} for g in groups]
+    return [{"id": g.id, "name": g.name, "orientation": g.orientation} for g in groups]
 
 
 class CreateGroupRequest(BaseModel):
     name: str
+    orientation: str
 
 
 @router.post("/groups", response_model=dict)
@@ -242,15 +244,23 @@ async def create_group(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    group = DeviceGroup(name=data.name.strip() or "새 그룹")
+    try:
+        orientation = normalize_group_orientation(data.orientation)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    group = DeviceGroup(
+        name=data.name.strip() or "새 그룹",
+        orientation=orientation,
+    )
     db.add(group)
     await db.flush()
     await db.refresh(group)
-    return {"id": group.id, "name": group.name}
+    return {"id": group.id, "name": group.name, "orientation": group.orientation}
 
 
 class UpdateGroupRequest(BaseModel):
     name: str
+    orientation: str
 
 
 @router.patch("/groups/{id}", response_model=dict)
@@ -264,10 +274,32 @@ async def update_group(
     group = result.scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+    try:
+        orientation = normalize_group_orientation(data.orientation)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    schedules = (
+        await db.execute(select(Schedule).where(Schedule.device_group_id == id))
+    ).scalars().all()
+    invalid_layouts = [
+        s.layout_id or "full"
+        for s in schedules
+        if not is_layout_allowed_for_orientation(s.layout_id, orientation)
+    ]
+    if invalid_layouts:
+        sample = ", ".join(invalid_layouts[:3])
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "이 그룹을 해당 방향으로 바꿀 수 없습니다. "
+                f"먼저 연결된 스케줄의 레이아웃을 수정해 주세요 (예: {sample})."
+            ),
+        )
     group.name = data.name.strip() or group.name
+    group.orientation = orientation
     await db.flush()
     await db.refresh(group)
-    return {"id": group.id, "name": group.name}
+    return {"id": group.id, "name": group.name, "orientation": group.orientation}
 
 
 @router.delete("/groups/{id}", status_code=204)

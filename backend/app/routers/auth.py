@@ -59,7 +59,7 @@ async def run_ensure_seed() -> dict:
     async with AsyncSessionLocal() as db:
         r = await db.execute(select(DeviceGroup).where(DeviceGroup.name == "기본"))
         if r.scalar_one_or_none() is None:
-            db.add(DeviceGroup(name="기본"))
+            db.add(DeviceGroup(name="기본", orientation="landscape"))
             await db.commit()
             created_group = True
 
