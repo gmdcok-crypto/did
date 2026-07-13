@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timedelta
 from app.auth import decode_access_token
 from app.database import get_db, AsyncSessionLocal
-from app.models import Device, DeviceGroup, User, PlaybackEvent
+from app.models import Device, DeviceGroup, User, PlaybackEvent, Schedule
 from app.deps import get_current_user
 from app.live_screen_stream import (
     clear_live_screen_session,
@@ -280,12 +280,27 @@ async def delete_group(
     group = result.scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+    schedules = (
+        await db.execute(select(Schedule).where(Schedule.device_group_id == id))
+    ).scalars().all()
+    if schedules:
+        names = [s.name.strip() for s in schedules if (s.name or "").strip()]
+        sample = ", ".join(names[:3]) if names else ""
+        extra = f" (예: {sample})" if sample else ""
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "이 그룹은 스케줄에서 사용 중이라 삭제할 수 없습니다. "
+                f"먼저 해당 스케줄의 그룹을 변경하거나 삭제한 뒤 다시 시도해 주세요{extra}."
+            ),
+        )
     # 소속 디바이스는 그룹 해제 후 삭제
     result = await db.execute(select(Device).where(Device.group_id == id))
     for device in result.scalars().all():
         device.group_id = None
     await db.delete(group)
     await db.flush()
+    await db.commit()
     broadcast_device_list_updated()
     broadcast_cms_dashboard_updated()
 
