@@ -26,7 +26,7 @@ const POLL_INTERVAL_MS = 2 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
 /** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
 const IMAGE_FADE_MS = 550
-const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.svg'
+const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.png'
 
 /** PC 브라우저에서 디코더가 멈춘 뒤 네트워크만 진행되는 경우 완화 — 과도한 재시도 방지 */
 const VIDEO_STALL_RECOVER_MS = 4000
