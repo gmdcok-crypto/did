@@ -26,6 +26,7 @@ const POLL_INTERVAL_MS = 2 * 60 * 1000
 const EVENT_QUEUE_KEY = 'did_event_queue'
 /** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
 const IMAGE_FADE_MS = 550
+const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.svg'
 
 /** PC 브라우저에서 디코더가 멈춘 뒤 네트워크만 진행되는 경우 완화 — 과도한 재시도 방지 */
 const VIDEO_STALL_RECOVER_MS = 4000
@@ -183,6 +184,7 @@ export default function App() {
   const liveScreenWsRef = useRef(null)
   const liveScreenTickRef = useRef(async () => {})
   const liveScreenStreamCloseRef = useRef(() => {})
+  const noContentAlertShownRef = useRef(false)
 
   useEffect(() => {
     scheduleRef.current = schedule
@@ -622,6 +624,17 @@ export default function App() {
     schedule && !scheduleHasPlayableItems && !scheduleLoading && !scheduleLoadError,
   )
 
+  useEffect(() => {
+    if (showNoContentHint && !noContentAlertShownRef.current) {
+      noContentAlertShownRef.current = true
+      window.alert('재생할 컨텐츠가 없습니다. 관리자에게 문의 해주세요.')
+      return
+    }
+    if (!showNoContentHint) {
+      noContentAlertShownRef.current = false
+    }
+  }, [showNoContentHint])
+
   const goHardReset = () => {
     const u = new URL(window.location.href)
     u.searchParams.set('reset', '1')
@@ -755,15 +768,12 @@ export default function App() {
       )}
       {!online && <div className="offline-banner">오프라인 재생 중</div>}
       {showNoContentHint && (
-        <div className="player-no-content-banner" role="status">
-          <strong>재생할 콘텐츠가 없습니다.</strong>
-          <span className="player-no-content-banner-sub">
-            CMS에서 이 기기의 <strong>디바이스 그룹</strong>에 맞는 <strong>활성 스케줄</strong>과{' '}
-            <strong>캠페인·콘텐츠</strong>를 넣었는지 확인하세요.
-          </span>
-          <a className="player-no-content-banner-link" href="/admin/" target="_blank" rel="noreferrer">
-            관리자 열기 (/admin/)
-          </a>
+        <div className="player-default-screen" role="img" aria-label="기본 자연환경 화면">
+          <img
+            className="player-default-screen-image"
+            src={DEFAULT_NO_CONTENT_IMAGE}
+            alt="기본 자연환경 화면"
+          />
         </div>
       )}
       <div

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Default Nature Screen</title>
+  <desc id="desc">A calm nature landscape with sky, mountains, trees, and a lake.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#7ecbff" />
+      <stop offset="55%" stop-color="#c9efff" />
+      <stop offset="100%" stop-color="#f5fbff" />
+    </linearGradient>
+    <linearGradient id="lake" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#70c6db" />
+      <stop offset="100%" stop-color="#2d7890" />
+    </linearGradient>
+    <linearGradient id="meadow" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#8ecb66" />
+      <stop offset="100%" stop-color="#4f8d37" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#sky)" />
+  <circle cx="1480" cy="180" r="88" fill="#fff6b0" opacity="0.95" />
+
+  <path d="M0 520 L220 360 L410 500 L620 280 L860 520 L1090 250 L1330 510 L1540 320 L1770 490 L1920 420 L1920 1080 L0 1080 Z" fill="#729eb0" />
+  <path d="M0 580 L180 430 L350 560 L560 370 L790 610 L1030 380 L1270 580 L1510 430 L1740 610 L1920 530 L1920 1080 L0 1080 Z" fill="#5d8394" />
+
+  <ellipse cx="990" cy="760" rx="1030" ry="210" fill="url(#lake)" />
+  <path d="M0 760 C260 700 430 700 650 760 C900 830 1080 830 1330 760 C1560 700 1710 700 1920 760 L1920 1080 L0 1080 Z" fill="url(#meadow)" />
+
+  <g fill="#356e33">
+    <path d="M180 760 l55 -140 l55 140 z" />
+    <rect x="225" y="760" width="18" height="88" fill="#6a4a2a" />
+    <path d="M320 800 l65 -170 l65 170 z" />
+    <rect x="378" y="800" width="20" height="98" fill="#6a4a2a" />
+    <path d="M1480 770 l60 -150 l60 150 z" />
+    <rect x="1533" y="770" width="18" height="90" fill="#6a4a2a" />
+    <path d="M1660 810 l70 -185 l70 185 z" />
+    <rect x="1723" y="810" width="22" height="110" fill="#6a4a2a" />
+  </g>
+
+  <g opacity="0.22" fill="#ffffff">
+    <ellipse cx="900" cy="760" rx="270" ry="18" />
+    <ellipse cx="1120" cy="810" rx="180" ry="12" />
+  </g>
+</svg>

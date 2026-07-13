@@ -118,6 +118,20 @@ body {
   z-index: 10;
 }
 
+.player-default-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #000;
+}
+
+.player-default-screen-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* flex(.player-full)의 align-items:center 때문에 높이 0으로 붕괴 → 검은 화면만 보이는 현상 방지 */
 .player-zones {
   position: absolute;

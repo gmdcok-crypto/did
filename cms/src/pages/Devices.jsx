@@ -643,6 +643,10 @@ export default function Devices() {
   }, [liveModal.open, liveModal.ticket, liveModal.liveDevicePk, liveModal.imageSrc, liveModal.liveManifest])
 
   const openLiveScreen = async (d) => {
+    if ((d?.status || '').toLowerCase() === 'offline') {
+      alert('오프라인 디바이스입니다. 실시간 화면을 볼 수 없습니다.')
+      return
+    }
     const myAbort = (livePollAbortRef.current += 1)
     setLiveModal({
       open: true,
