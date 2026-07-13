@@ -156,6 +156,46 @@ async def init_db():
 
         await conn.run_sync(ensure_device_group_orientation)
 
+        def ensure_schedule_updated_at(sync_conn):
+            from sqlalchemy import inspect
+
+            try:
+                columns = {col["name"] for col in inspect(sync_conn).get_columns("schedules")}
+            except Exception:
+                columns = set()
+            if "updated_at" not in columns:
+                dialect = engine.dialect.name
+                if dialect == "sqlite":
+                    stmt = (
+                        "ALTER TABLE schedules "
+                        "ADD COLUMN updated_at DATETIME"
+                    )
+                elif dialect in ("mysql", "mariadb"):
+                    stmt = (
+                        "ALTER TABLE schedules "
+                        "ADD COLUMN updated_at DATETIME NULL"
+                    )
+                else:
+                    stmt = (
+                        "ALTER TABLE schedules "
+                        "ADD COLUMN updated_at TIMESTAMP NULL"
+                    )
+                try:
+                    sync_conn.execute(text(stmt))
+                except Exception:
+                    pass
+            try:
+                sync_conn.execute(
+                    text(
+                        "UPDATE schedules SET updated_at = created_at "
+                        "WHERE updated_at IS NULL"
+                    )
+                )
+            except Exception:
+                pass
+
+        await conn.run_sync(ensure_schedule_updated_at)
+
 async def _log_live_screen_redis_status() -> None:
     """기동 직후 Redis 실시간 화면 설정 여부를 한 번 로그 (진단용)."""
     await asyncio.sleep(3.0)

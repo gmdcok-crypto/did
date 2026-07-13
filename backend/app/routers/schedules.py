@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
+from datetime import datetime
 from typing import Optional
 from app.database import get_db
 from app.models import Schedule, Campaign, DeviceGroup, User
@@ -84,6 +85,7 @@ async def create_schedule(
         device_group_id=data.device_group_id,
         layout_id=normalize_layout_id(data.layout_id),
         layout_config=data.layout_config,
+        updated_at=datetime.utcnow(),
     )
     db.add(s)
     await db.flush()
@@ -120,6 +122,7 @@ async def update_schedule(
         s.layout_config = data.layout_config
     if data.is_active is not None:
         s.is_active = data.is_active
+    s.updated_at = datetime.utcnow()
     await db.flush()
     await db.refresh(s)
     await db.commit()

@@ -152,7 +152,7 @@ async def get_schedule(
     result = await db.execute(
         select(Schedule)
         .where(Schedule.device_group_id == device.group_id, Schedule.is_active == True)
-        .order_by(Schedule.id.desc())
+        .order_by(Schedule.updated_at.desc(), Schedule.id.desc())
         .limit(1)
     )
     schedule = result.scalar_one_or_none()
