@@ -170,6 +170,7 @@ export default function App() {
   const [schedule, setSchedule] = useState(null)
   const [error, setError] = useState(null)
   const [online, setOnline] = useState(navigator.onLine)
+  const [transientAlert, setTransientAlert] = useState('')
   const [registerAuthCode, setRegisterAuthCode] = useState('')
   const [registerName, setRegisterName] = useState('')
   const [registerLocation, setRegisterLocation] = useState('')
@@ -185,6 +186,7 @@ export default function App() {
   const liveScreenTickRef = useRef(async () => {})
   const liveScreenStreamCloseRef = useRef(() => {})
   const noContentAlertShownRef = useRef(false)
+  const transientAlertTimerRef = useRef(null)
 
   useEffect(() => {
     scheduleRef.current = schedule
@@ -627,13 +629,28 @@ export default function App() {
   useEffect(() => {
     if (showNoContentHint && !noContentAlertShownRef.current) {
       noContentAlertShownRef.current = true
-      window.alert('재생할 컨텐츠가 없습니다. 관리자에게 문의 해주세요.')
+      setTransientAlert('재생할 컨텐츠가 없습니다. 관리자에게 문의 해주세요.')
       return
     }
     if (!showNoContentHint) {
       noContentAlertShownRef.current = false
     }
   }, [showNoContentHint])
+
+  useEffect(() => {
+    if (!transientAlert) return
+    if (transientAlertTimerRef.current) clearTimeout(transientAlertTimerRef.current)
+    transientAlertTimerRef.current = setTimeout(() => {
+      transientAlertTimerRef.current = null
+      setTransientAlert('')
+    }, 3000)
+    return () => {
+      if (transientAlertTimerRef.current) {
+        clearTimeout(transientAlertTimerRef.current)
+        transientAlertTimerRef.current = null
+      }
+    }
+  }, [transientAlert])
 
   const goHardReset = () => {
     const u = new URL(window.location.href)
@@ -701,6 +718,11 @@ export default function App() {
   return (
     <>
     <div className="player-full">
+      {transientAlert && (
+        <div className="player-transient-alert" role="status" aria-live="polite">
+          {transientAlert}
+        </div>
+      )}
       {scheduleLoading && (
         <div className="player-schedule-loading-banner" role="status">
           스케줄 연결 중…
