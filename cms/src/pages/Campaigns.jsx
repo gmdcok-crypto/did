@@ -11,6 +11,7 @@ const TABS = [
   { id: 'list', label: '목록' },
   { id: 'add', label: '추가' },
 ]
+const DELETE_BLOCKED_MESSAGE = '지금 삭제 할 수 없읍니다. 다른곳에서 사용중 입니다.'
 
 export default function Campaigns() {
   const [activeTab, setActiveTab] = useState('list')
@@ -168,7 +169,12 @@ export default function Campaigns() {
       await api(`/campaigns/${c.id}`, { method: 'DELETE' })
       loadCampaigns()
     } catch (e) {
-      alert(e.message || '삭제에 실패했습니다.')
+      const msg = e?.message || ''
+      if (msg.includes(DELETE_BLOCKED_MESSAGE) || msg.startsWith('HTTP 409:')) {
+        alert(DELETE_BLOCKED_MESSAGE)
+        return
+      }
+      alert(msg || '삭제에 실패했습니다.')
     }
   }
 

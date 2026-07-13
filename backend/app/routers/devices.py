@@ -44,6 +44,7 @@ from app.sse_broadcast import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+DELETE_BLOCKED_MESSAGE = "지금 삭제 할 수 없읍니다. 다른곳에서 사용중 입니다."
 
 
 def _effective_device_status(device: Device) -> str:
@@ -316,16 +317,7 @@ async def delete_group(
         await db.execute(select(Schedule).where(Schedule.device_group_id == id))
     ).scalars().all()
     if schedules:
-        names = [s.name.strip() for s in schedules if (s.name or "").strip()]
-        sample = ", ".join(names[:3]) if names else ""
-        extra = f" (예: {sample})" if sample else ""
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "이 그룹은 스케줄에서 사용 중이라 삭제할 수 없습니다. "
-                f"먼저 해당 스케줄의 그룹을 변경하거나 삭제한 뒤 다시 시도해 주세요{extra}."
-            ),
-        )
+        raise HTTPException(status_code=409, detail=DELETE_BLOCKED_MESSAGE)
     # 소속 디바이스는 그룹 해제 후 삭제
     result = await db.execute(select(Device).where(Device.group_id == id))
     for device in result.scalars().all():

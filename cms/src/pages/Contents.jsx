@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { api, uploadFile } from '../lib/api'
 import { subscribeCmsDeviceEvents, CMS_SSE_DASHBOARD } from '../lib/cmsSse'
 
+const DELETE_BLOCKED_MESSAGE = '지금 삭제 할 수 없읍니다. 다른곳에서 사용중 입니다.'
+
 export default function Contents() {
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -120,6 +122,8 @@ export default function Contents() {
       const msg = e?.message || String(e)
       if (msg === 'Failed to fetch' || msg.includes('fetch')) {
         alert('삭제 요청이 실패했습니다. 백엔드가 실행 중인지 확인해 주세요.')
+      } else if (msg.includes(DELETE_BLOCKED_MESSAGE) || msg.startsWith('HTTP 409:')) {
+        alert(DELETE_BLOCKED_MESSAGE)
       } else {
         alert(msg)
       }

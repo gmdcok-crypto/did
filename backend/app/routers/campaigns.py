@@ -6,12 +6,13 @@ from datetime import datetime
 from typing import Optional
 from app.database import get_db
 from app.datetime_kst import to_kst_iso
-from app.models import Campaign, CampaignContent, User
+from app.models import Campaign, CampaignContent, Schedule, User
 from app.deps import get_current_user
 from app.sse_broadcast import broadcast_cms_dashboard_updated, broadcast_schedule_updated
 from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
+DELETE_BLOCKED_MESSAGE = "지금 삭제 할 수 없읍니다. 다른곳에서 사용중 입니다."
 
 
 class CampaignCreate(BaseModel):
@@ -149,6 +150,9 @@ async def delete_campaign(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    schedule_result = await db.execute(select(Schedule).where(Schedule.campaign_id == campaign_id).limit(1))
+    if schedule_result.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=409, detail=DELETE_BLOCKED_MESSAGE)
     await db.execute(delete(CampaignContent).where(CampaignContent.campaign_id == campaign_id))
     await db.delete(c)
     await db.flush()

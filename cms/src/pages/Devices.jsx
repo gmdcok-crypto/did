@@ -8,6 +8,7 @@ const GROUP_ORIENTATION_OPTIONS = [
   { value: 'landscape', label: '가로형' },
   { value: 'portrait', label: '세로형' },
 ]
+const DELETE_BLOCKED_MESSAGE = '지금 삭제 할 수 없읍니다. 다른곳에서 사용중 입니다.'
 
 function getGroupOrientationLabel(orientation) {
   return orientation === 'portrait' ? '세로형' : '가로형'
@@ -405,7 +406,12 @@ export default function Devices() {
       setNewGroupOrientation('landscape')
       load()
     } catch (e) {
-      alert(e.message)
+      const msg = e?.message || ''
+      if (msg.includes(DELETE_BLOCKED_MESSAGE) || msg.startsWith('HTTP 409:')) {
+        alert(DELETE_BLOCKED_MESSAGE)
+        return
+      }
+      alert(msg)
     }
   }
 
