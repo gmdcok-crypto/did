@@ -27,6 +27,7 @@ const EVENT_QUEUE_KEY = 'did_event_queue'
 /** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
 const IMAGE_FADE_MS = 550
 const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.png'
+const DEFAULT_NO_CONTENT_IMAGE_PORTRAIT = '/default-nature-portrait.png'
 
 /** PC 브라우저에서 디코더가 멈춘 뒤 네트워크만 진행되는 경우 완화 — 과도한 재시도 방지 */
 const VIDEO_STALL_RECOVER_MS = 4000
@@ -99,6 +100,10 @@ function DeviceIdStrip({ deviceId, schedule }) {
       <div className="player-device-id-strip-verdict">→ {m.matchLabel}</div>
     </div>
   )
+}
+
+function isPortraitLayout(layoutId) {
+  return layoutId === 'full_portrait' || layoutId === 'split_v'
 }
 
 /** 탭 복귀 시 일부 모바일 브라우저에서 비디오가 멈춘 채 검은 화면만 남는 현상 완화 */
@@ -625,6 +630,9 @@ export default function App() {
   const showNoContentHint = Boolean(
     schedule && !scheduleHasPlayableItems && !scheduleLoading && !scheduleLoadError,
   )
+  const defaultNoContentImage = isPortraitLayout(schedule?.layout_id)
+    ? DEFAULT_NO_CONTENT_IMAGE_PORTRAIT
+    : DEFAULT_NO_CONTENT_IMAGE
 
   useEffect(() => {
     if (showNoContentHint && !noContentAlertShownRef.current) {
@@ -793,7 +801,7 @@ export default function App() {
         <div className="player-default-screen" role="img" aria-label="기본 자연환경 화면">
           <img
             className="player-default-screen-image"
-            src={DEFAULT_NO_CONTENT_IMAGE}
+            src={defaultNoContentImage}
             alt="기본 자연환경 화면"
           />
         </div>
