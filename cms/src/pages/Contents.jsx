@@ -275,7 +275,7 @@ export default function Contents() {
                             className="btn btn-sm btn-danger"
                             onClick={() => deleteContent(c)}
                           >
-                            삭제
+                            지우기
                           </button>
                         </td>
                       </>

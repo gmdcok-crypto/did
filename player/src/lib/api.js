@@ -21,17 +21,51 @@ export function getMediaBaseUrl() {
 }
 
 const DEVICE_ID_KEY = 'did_device_id'
+const DEVICE_ID_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+function readDeviceIdCookie() {
+  if (typeof document === 'undefined') return null
+  const key = `${DEVICE_ID_KEY}=`
+  const part = document.cookie
+    .split(';')
+    .map((x) => x.trim())
+    .find((x) => x.startsWith(key))
+  if (!part) return null
+  const value = decodeURIComponent(part.slice(key.length)).trim()
+  return value || null
+}
+
+function writeDeviceIdCookie(id) {
+  if (typeof document === 'undefined') return
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = `${DEVICE_ID_KEY}=${encodeURIComponent(id)}; Max-Age=${DEVICE_ID_COOKIE_MAX_AGE}; Path=/; SameSite=Lax${secure}`
+}
+
+function clearDeviceIdCookie() {
+  if (typeof document === 'undefined') return
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = `${DEVICE_ID_KEY}=; Max-Age=0; Path=/; SameSite=Lax${secure}`
+}
 
 /** CMS에서 기기 삭제 등으로 서버에 없을 때 (스케줄 404) */
 export const DEVICE_NOT_FOUND = 'DEVICE_NOT_FOUND'
 
 export function getDeviceId() {
-  return localStorage.getItem(DEVICE_ID_KEY)
+  const local = localStorage.getItem(DEVICE_ID_KEY)
+  if (local && local.trim()) return local.trim()
+  const cookie = readDeviceIdCookie()
+  if (cookie) {
+    localStorage.setItem(DEVICE_ID_KEY, cookie)
+    return cookie
+  }
+  return null
 }
 
 export function setDeviceId(id) {
   if (id && id.trim()) {
-    localStorage.setItem(DEVICE_ID_KEY, id.trim())
+    const normalized = id.trim()
+    localStorage.setItem(DEVICE_ID_KEY, normalized)
+    writeDeviceIdCookie(normalized)
     return true
   }
   return false
@@ -39,6 +73,7 @@ export function setDeviceId(id) {
 
 export function clearDeviceId() {
   localStorage.removeItem(DEVICE_ID_KEY)
+  clearDeviceIdCookie()
 }
 
 /** PWA 캐시에 남은 스케줄 응답 제거 (기기 삭제 후 재등록 시 이전 화면 방지) */
@@ -154,10 +189,10 @@ export async function hardResetPlayerCaches() {
 
 /** localStorage에 없으면 임시 ID 생성 (등록 전까지 사용) */
 export function getOrCreateDeviceId() {
-  let id = localStorage.getItem(DEVICE_ID_KEY)
+  let id = getDeviceId()
   if (!id) {
     id = crypto.randomUUID ? crypto.randomUUID() : `dev-${Date.now()}`
-    localStorage.setItem(DEVICE_ID_KEY, id)
+    setDeviceId(id)
   }
   return id
 }

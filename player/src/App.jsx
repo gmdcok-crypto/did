@@ -27,6 +27,7 @@ const EVENT_QUEUE_KEY = 'did_event_queue'
 /** 이미지 전환 페이드 — style.css `mediaImageFadeIn` 길이와 맞출 것 */
 const IMAGE_FADE_MS = 550
 const DEVICE_NOT_FOUND_CONFIRM_COUNT = 3
+const DEVICE_NOT_FOUND_CONFIRM_DELAY_MS = 900
 const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.png'
 const DEFAULT_NO_CONTENT_IMAGE_PORTRAIT = '/default-nature-portrait.png'
 
@@ -192,7 +193,6 @@ export default function App() {
   const liveScreenTickRef = useRef(async () => {})
   const liveScreenStreamCloseRef = useRef(() => {})
   const noContentAlertShownRef = useRef(false)
-  const deviceNotFoundCountRef = useRef(0)
   const transientAlertTimerRef = useRef(null)
 
   useEffect(() => {
@@ -252,7 +252,6 @@ export default function App() {
     try {
       setError(null)
       const data = await fetchSchedule(deviceId, forceRefresh ? { cacheBust: true } : {})
-      deviceNotFoundCountRef.current = 0
       setSchedule(data)
       if (data) {
         saveScheduleToStorage(deviceId, data)
@@ -261,20 +260,33 @@ export default function App() {
     } catch (e) {
       // CMS에서 기기 삭제됨: 로컬/캐시로 옛 스케줄 재생하지 않고 재등록 유도
       if (e.code === DEVICE_NOT_FOUND) {
-        deviceNotFoundCountRef.current += 1
         const cached = readScheduleFromStorage(deviceId)
-        if (deviceNotFoundCountRef.current < DEVICE_NOT_FOUND_CONFIRM_COUNT) {
-          console.warn(
-            '[DID player] device lookup 404; keeping registration until repeated confirmation',
-            { device_id: deviceId, count: deviceNotFoundCountRef.current },
-          )
-          if (cached) {
-            setSchedule(cached)
-            setError(null)
-            return cached
+        for (let attempt = 2; attempt <= DEVICE_NOT_FOUND_CONFIRM_COUNT; attempt++) {
+          await new Promise((r) => setTimeout(r, DEVICE_NOT_FOUND_CONFIRM_DELAY_MS * (attempt - 1)))
+          try {
+            const confirmed = await fetchSchedule(deviceId, { cacheBust: true, timeoutMs: 12000 })
+            setSchedule(confirmed)
+            if (confirmed) {
+              saveScheduleToStorage(deviceId, confirmed)
+            }
+            return confirmed
+          } catch (confirmErr) {
+            if (confirmErr?.code !== DEVICE_NOT_FOUND) {
+              const msg = confirmErr?.message || String(confirmErr)
+              console.warn('[DID player] device lookup 404 recovered as non-404 error', {
+                device_id: deviceId,
+                attempt,
+                error: msg,
+              })
+              if (cached && !forceRefresh) {
+                setSchedule(cached)
+                setError(null)
+                return cached
+              }
+              setError(msg)
+              return null
+            }
           }
-          setError('기기 연결을 확인하는 중입니다. 잠시 후 다시 시도합니다.')
-          return null
         }
         clearDeviceId()
         clearAllScheduleStorageCaches()
