@@ -20,7 +20,7 @@ import {
   hardResetPlayerCaches,
 } from './lib/api'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
-import { resolveVideoPlaySource } from './lib/videoSource'
+import { isLowPowerPlayer, resolveVideoPlaySource } from './lib/videoSource'
 
 /** 스케줄 폴링 — last_seen 갱신 주기(오프라인 판정과 맞춤, 기본 2분) */
 const POLL_INTERVAL_MS = 2 * 60 * 1000
@@ -34,7 +34,7 @@ const DEFAULT_NO_CONTENT_IMAGE_PORTRAIT = '/default-nature-portrait.png'
 
 /** R2 + TOX3: 재생 중 부가 트래픽 최소화 */
 const VIDEO_WAITING_NUDGE_MS = 8000
-const LIVE_SCREEN_POLL_MS = 30000
+const LIVE_SCREEN_POLL_MS = isLowPowerPlayer() ? 60000 : 30000
 const LIVE_SCREEN_MANIFEST_MS = 2000
 
 /** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
@@ -1096,9 +1096,9 @@ function MediaBlock({
   const videoErrorRecoverOnceRef = useRef(false)
   const videoRevokeRef = useRef(null)
   const [playSrc, setPlaySrc] = useState('')
-  const [videoPreparing, setVideoPreparing] = useState(false)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
-  const mediaCrossOrigin = crossOriginForMediaUrl(url)
+  // 저사양(TOX3)에서는 crossOrigin 미사용 유지 — CORS/디코드 부담 감소
+  const mediaCrossOrigin = isLowPowerPlayer() ? undefined : crossOriginForMediaUrl(url)
   const contentIdInt = parseContentIdForEvents(item?.id)
   const logId = item?.id ?? item?.url ?? ''
 
@@ -1130,38 +1130,45 @@ function MediaBlock({
     if (contentIdInt == null) return
     if (hasReported.current) return
     hasReported.current = true
-    const t = window.setTimeout(() => reportEvent(contentIdInt, 'impression'), 3000)
+    // TOX3: 재생 초반 네트워크를 이벤트 API에 안 뺏기게 더 늦게
+    const delay = isLowPowerPlayer() ? 12000 : 3000
+    const t = window.setTimeout(() => reportEvent(contentIdInt, 'impression'), delay)
     return () => {
       clearTimeout(t)
       reportEvent(contentIdInt, 'complete')
     }
   }, [contentIdInt, reportEvent])
 
-  /** R2는 가능하면 blob 로컬 재생(버벅임 감소). CORS 실패 시 원격 progressive 폴백 */
+  /**
+   * TOX3: 무조건 원격 URL로 즉시 재생 시작(준비 대기 없음).
+   * 캐시 hit 이 있으면 빠른 전환만 하고, 전체 다운로드 대기는 하지 않음.
+   */
   useEffect(() => {
     if (item?.type !== 'video' || !url) {
       setPlaySrc('')
-      setVideoPreparing(false)
       return undefined
     }
     let cancelled = false
     const ac = new AbortController()
-    setVideoPreparing(true)
-    setPlaySrc('')
     videoErrorRecoverOnceRef.current = false
+    setPlaySrc(url)
     ;(async () => {
-      const resolved = await resolveVideoPlaySource(url, { signal: ac.signal })
+      const resolved = await resolveVideoPlaySource(url, {
+        signal: ac.signal,
+        cacheOnly: isLowPowerPlayer(),
+        forceRemote: false,
+      })
       if (cancelled) {
         resolved.revoke?.()
         return
       }
+      if (!resolved.local) return
       if (videoRevokeRef.current) {
         videoRevokeRef.current()
         videoRevokeRef.current = null
       }
       if (resolved.revoke) videoRevokeRef.current = resolved.revoke
       setPlaySrc(resolved.src || url)
-      setVideoPreparing(false)
     })()
     return () => {
       cancelled = true
@@ -1206,13 +1213,6 @@ function MediaBlock({
       return (
         <div className="zone-placeholder">
           <span>동영상 URL 없음</span>
-        </div>
-      )
-    }
-    if (videoPreparing && !playSrc) {
-      return (
-        <div className="zone-placeholder">
-          <span>동영상 준비 중…</span>
         </div>
       )
     }
