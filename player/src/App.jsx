@@ -1042,6 +1042,7 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   }
 
   const prevItem = prevIndex != null ? items[prevIndex % items.length] : null
+  const nextItem = items[(index + 1) % items.length]
 
   return (
     <div className="zone">
@@ -1070,8 +1071,29 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
             }
           />
       </div>
+      {nextItem && nextItem.type === 'image' && nextItem.id !== item?.id && (
+        <NextImagePreload item={nextItem} mediaBaseUrl={mediaBaseUrl} />
+      )}
     </div>
   )
+}
+
+/** 다음 이미지만 미리 받아 TOX3 전환 지연 완화 (동영상 프리페치는 대역폭 때문에 하지 않음) */
+function NextImagePreload({ item, mediaBaseUrl }) {
+  const url =
+    item?.url && item.url.startsWith('/uploads')
+      ? (mediaBaseUrl || '') + item.url
+      : item?.url || ''
+  useEffect(() => {
+    if (!url) return undefined
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = url
+    return () => {
+      img.src = ''
+    }
+  }, [url])
+  return null
 }
 
 function parseContentIdForEvents(id) {

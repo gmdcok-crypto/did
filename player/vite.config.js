@@ -89,13 +89,13 @@ export default defineConfig({
             urlPattern: /\/api\/player\/live-screen-poll/,
             handler: 'NetworkOnly',
           },
-          // R2/동영상: SW가 Range 요청을 가로채면 TOX3에서 버퍼링·끊김 → 브라우저 직접 스트리밍
+          // 동영상만 NetworkOnly (Range 스트리밍). 이미지는 아래 CacheFirst로 받아야 함.
           {
-            urlPattern: /^https:\/\/[^/]*\.r2\.dev\/.*/i,
+            urlPattern: /^https:\/\/[^/]*\.r2\.dev\/.*\.(?:mp4|webm|ogg|m4v)(?:\?.*)?$/i,
             handler: 'NetworkOnly',
           },
           {
-            urlPattern: /^https:\/\/[^/]*\.cloudflarestorage\.com\/.*/i,
+            urlPattern: /^https:\/\/[^/]*\.cloudflarestorage\.com\/.*\.(?:mp4|webm|ogg|m4v)(?:\?.*)?$/i,
             handler: 'NetworkOnly',
           },
           {
@@ -106,13 +106,21 @@ export default defineConfig({
             urlPattern: /\/uploads\/.*\.(?:mp4|webm|ogg|m4v)(?:\?.*)?$/i,
             handler: 'NetworkOnly',
           },
-          // 이미지만 캐시 (동영상 제외)
+          // R2/로컬 이미지: 첫 로드 후 기기 캐시 — TOX3에서 반복 로딩 지연 완화
+          {
+            urlPattern: /^https:\/\/[^/]*\.r2\.dev\/.*\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?.*)?$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'r2-image-cache',
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 14 },
+            },
+          },
           {
             urlPattern: /\/uploads\/.*\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?.*)?$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'uploads-image-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 14 },
             },
           },
           {
@@ -120,7 +128,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'media-image-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 14 },
             },
           },
         ],
