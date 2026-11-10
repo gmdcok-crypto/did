@@ -174,7 +174,7 @@ export default function Contents() {
             disabled={uploading}
             title="탐색기에서 파일 선택 후 업로드"
           >
-            {uploading ? '업로드 중…' : '📁'}
+            {uploading ? '최적화·업로드 중…' : '📁'}
           </button>
           <input
             type="number"

@@ -22,6 +22,7 @@ COPY backend/requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libstdc++6 \
+    ffmpeg \
     && pip install --no-cache-dir --prefer-binary -r requirements.txt \
     && apt-get purge -y build-essential \
     && apt-get autoremove -y \

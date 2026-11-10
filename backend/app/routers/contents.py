@@ -111,12 +111,18 @@ async def upload_content_file(
         )
     try:
         content = await file.read()
-        # 큰 원본 이미지는 DID/TOX3 표시용으로 리사이즈·압축 후 저장
+        # DID/TOX3 표시용으로 업로드 시 최적화 후 저장
         kind = next((k for k, exts in ALLOWED_EXTENSIONS.items() if ext in exts), "image")
         if kind == "image" and ext in {".jpg", ".jpeg", ".png", ".webp"}:
             from app.image_optimize import optimize_image_bytes
 
             content, ext = optimize_image_bytes(content, ext)
+        elif kind == "video" and ext in {".mp4", ".webm", ".ogg", ".mov", ".m4v"}:
+            import asyncio
+            from app.video_optimize import optimize_video_bytes_safe
+
+            # ffmpeg 변환은 CPU 부하 — 이벤트 루프 블로킹 방지
+            content, ext = await asyncio.to_thread(optimize_video_bytes_safe, content, ext)
         url, key = upload_media_bytes(settings, content, ext)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
