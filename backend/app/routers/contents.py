@@ -49,6 +49,12 @@ class ContentItem(BaseModel):
 class UploadResponse(BaseModel):
     url: str
     filename: str
+    optimized: bool = False
+    width: Optional[int] = None
+    height: Optional[int] = None
+    size_kb: Optional[int] = None
+    duration_sec: Optional[float] = None
+    message: str = ""
 
 
 class RepointR2UrlItem(BaseModel):
@@ -109,6 +115,10 @@ async def upload_content_file(
             status_code=400,
             detail="허용 확장자: 이미지(jpg,png,gif,webp,svg), 동영상(mp4,webm,ogg,mov), HTML(html,htm)",
         )
+    optimized = False
+    width = height = None
+    duration_sec = None
+    message = ""
     try:
         content = await file.read()
         # DID/TOX3 표시용으로 업로드 시 최적화 후 저장
@@ -117,6 +127,8 @@ async def upload_content_file(
             from app.image_optimize import optimize_image_bytes
 
             content, ext = optimize_image_bytes(content, ext)
+            optimized = True
+            message = "이미지 최적화 후 저장됨"
         elif kind == "video" and ext in {".mp4", ".webm", ".ogg", ".mov", ".m4v"}:
             import asyncio
             from app.video_optimize import VideoOptimizeError, optimize_video_bytes_safe
@@ -124,16 +136,33 @@ async def upload_content_file(
             # ffmpeg 변환은 CPU 부하 — 이벤트 루프 블로킹 방지
             # 실패 시 원본(4K 등)을 저장하지 않음 — TOX3 끊김 방지
             try:
-                content, ext = await asyncio.to_thread(optimize_video_bytes_safe, content, ext)
+                result = await asyncio.to_thread(optimize_video_bytes_safe, content, ext)
             except VideoOptimizeError as ve:
                 raise HTTPException(status_code=400, detail=str(ve)) from ve
+            content, ext = result.body, result.ext
+            optimized = True
+            width, height = result.width, result.height
+            duration_sec = result.duration_sec
+            message = (
+                f"TOX3 최적화 완료: {width or '?'}x{height or '?'} / "
+                f"{max(1, len(content) // 1024)}KB"
+            )
         url, key = upload_media_bytes(settings, content, ext)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
     filename = key.split("/")[-1] if "/" in key else key
-    return UploadResponse(url=url, filename=filename)
+    return UploadResponse(
+        url=url,
+        filename=filename,
+        optimized=optimized,
+        width=width,
+        height=height,
+        size_kb=max(1, len(content) // 1024),
+        duration_sec=duration_sec,
+        message=message,
+    )
 
 
 @router.get("", response_model=list[ContentItem])

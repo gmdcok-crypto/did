@@ -76,6 +76,13 @@ export default function Contents() {
           else if (ext === '.html' || ext === '.htm') type = 'html'
           return { ...f, url: data.url, name, type }
         })
+        if (data?.message) {
+          alert(
+            `${data.message}\n\n※ 새 미디어를 저장한 뒤, 캠페인에서 기존 영상을 이 새 미디어로 교체해야 화면에 반영됩니다.`,
+          )
+        } else if (data?.optimized) {
+          alert('최적화 업로드 완료. 캠페인에서 새 미디어로 교체했는지 확인하세요.')
+        }
       })
       .catch((err) => alert(err.message))
       .finally(() => {

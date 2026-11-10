@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import shutil
 import subprocess
 import tempfile
-from typing import Tuple
+from dataclasses import dataclass
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# 잘 재생되던 medium 샘플(~2Mbps/720p)에 맞춘 상한
+# 잘 재생되던 medium 샘플(~2Mbps/720p)보다 조금 더 보수적으로
 MAX_HEIGHT = 720
-TARGET_MAXRATE = "2500k"
-TARGET_BUFSIZE = "5000k"
+TARGET_MAXRATE = "1800k"
+TARGET_BUFSIZE = "3600k"
 TARGET_FPS = "30"
 FFMPEG_TIMEOUT_SEC = 900
 
@@ -24,14 +24,23 @@ class VideoOptimizeError(Exception):
     """변환 실패 — 원본을 그대로 올리면 TOX3에서 끊김."""
 
 
+@dataclass
+class VideoOptimizeResult:
+    body: bytes
+    ext: str
+    width: Optional[int] = None
+    height: Optional[int] = None
+    duration_sec: Optional[float] = None
+
+
 def ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
-def _probe_height(path: str) -> int | None:
+def _probe_video(path: str) -> tuple[Optional[int], Optional[int], Optional[float]]:
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
-        return None
+        return None, None, None
     try:
         proc = subprocess.run(
             [
@@ -41,9 +50,9 @@ def _probe_height(path: str) -> int | None:
                 "-select_streams",
                 "v:0",
                 "-show_entries",
-                "stream=height",
+                "stream=width,height:format=duration",
                 "-of",
-                "csv=p=0",
+                "default=noprint_wrappers=1",
                 path,
             ],
             capture_output=True,
@@ -52,18 +61,26 @@ def _probe_height(path: str) -> int | None:
             check=False,
         )
         if proc.returncode != 0:
-            return None
-        m = re.search(r"(\d+)", (proc.stdout or "").strip())
-        return int(m.group(1)) if m else None
+            return None, None, None
+        width = height = None
+        duration = None
+        for line in (proc.stdout or "").splitlines():
+            if line.startswith("width="):
+                width = int(line.split("=", 1)[1])
+            elif line.startswith("height="):
+                height = int(line.split("=", 1)[1])
+            elif line.startswith("duration="):
+                try:
+                    duration = float(line.split("=", 1)[1])
+                except ValueError:
+                    duration = None
+        return width, height, duration
     except Exception:
-        return None
+        return None, None, None
 
 
-def optimize_video_bytes(body: bytes, ext: str) -> Tuple[bytes, str]:
-    """
-    동영상을 TOX3 재생용 MP4로 변환.
-    실패 시 원본을 반환하지 않고 VideoOptimizeError 발생.
-    """
+def optimize_video_bytes(body: bytes, ext: str) -> VideoOptimizeResult:
+    """동영상을 TOX3 재생용 MP4로 변환. 실패 시 예외."""
     e = (ext or "").lower()
     if e not in {".mp4", ".webm", ".ogg", ".mov", ".m4v"}:
         raise VideoOptimizeError(f"지원하지 않는 동영상 확장자: {e}")
@@ -71,7 +88,7 @@ def optimize_video_bytes(body: bytes, ext: str) -> Tuple[bytes, str]:
         raise VideoOptimizeError("빈 동영상 파일입니다.")
     if not ffmpeg_available():
         raise VideoOptimizeError(
-            "서버에 ffmpeg가 없어 동영상을 TOX3용으로 변환할 수 없습니다. 배포 이미지를 확인하세요."
+            "서버에 ffmpeg가 없어 동영상을 TOX3용으로 변환할 수 없습니다. Railway 재배포(ffmpeg 포함 이미지)를 확인하세요."
         )
 
     in_path = None
@@ -83,7 +100,6 @@ def optimize_video_bytes(body: bytes, ext: str) -> Tuple[bytes, str]:
         out_fd, out_path = tempfile.mkstemp(suffix=".mp4")
         os.close(out_fd)
 
-        # 4K 등도 강제 720p 이하 + 비트레이트 상한(잘 되던 ~2Mbps급)
         vf = (
             f"scale=-2:'min({MAX_HEIGHT},ih)':force_original_aspect_ratio=decrease,"
             "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
@@ -101,15 +117,15 @@ def optimize_video_bytes(body: bytes, ext: str) -> Tuple[bytes, str]:
             "-preset",
             "veryfast",
             "-crf",
-            "23",
+            "24",
             "-maxrate",
             TARGET_MAXRATE,
             "-bufsize",
             TARGET_BUFSIZE,
             "-profile:v",
-            "main",
+            "baseline",
             "-level",
-            "4.0",
+            "3.1",
             "-pix_fmt",
             "yuv420p",
             "-an",
@@ -128,26 +144,39 @@ def optimize_video_bytes(body: bytes, ext: str) -> Tuple[bytes, str]:
         if proc.returncode != 0:
             err = (proc.stderr or b"").decode("utf-8", errors="replace")[-1000:]
             logger.error("ffmpeg optimize failed: %s", err)
-            raise VideoOptimizeError("동영상 TOX3 최적화(ffmpeg)에 실패했습니다. 다른 파일로 다시 시도하세요.")
+            raise VideoOptimizeError(
+                "동영상 TOX3 최적화(ffmpeg)에 실패했습니다. 파일이 너무 크면 더 짧게 잘라 다시 올려보세요."
+            )
 
         with open(out_path, "rb") as f:
             out = f.read()
         if not out or len(out) < 32:
             raise VideoOptimizeError("변환 결과 파일이 비어 있습니다.")
 
-        height = _probe_height(out_path)
+        width, height, duration = _probe_video(out_path)
         if height is not None and height > MAX_HEIGHT + 2:
             raise VideoOptimizeError(
                 f"변환 후에도 해상도가 너무 큽니다({height}p). 업로드를 중단합니다."
             )
 
+        # 원본이 이미 작은데 변환이 이상하게 커진 경우만 차단(4K 원본 통과 금지)
+        if len(out) > len(body) and len(body) > 40 * 1024 * 1024:
+            raise VideoOptimizeError("변환 결과가 원본보다 큽니다. 변환을 중단합니다.")
+
         logger.info(
-            "video optimized: in=%sKB out=%sKB height=%s",
+            "video optimized: in=%sKB out=%sKB %sx%s",
             len(body) // 1024,
             len(out) // 1024,
+            width,
             height,
         )
-        return out, ".mp4"
+        return VideoOptimizeResult(
+            body=out,
+            ext=".mp4",
+            width=width,
+            height=height,
+            duration_sec=duration,
+        )
     except VideoOptimizeError:
         raise
     except subprocess.TimeoutExpired as ex:
@@ -163,6 +192,5 @@ def optimize_video_bytes(body: bytes, ext: str) -> Tuple[bytes, str]:
                     pass
 
 
-def optimize_video_bytes_safe(body: bytes, ext: str) -> Tuple[bytes, str]:
-    """업로드 경로용 — 실패 시 예외를 그대로 전달(원본 저장 금지)."""
+def optimize_video_bytes_safe(body: bytes, ext: str) -> VideoOptimizeResult:
     return optimize_video_bytes(body, ext)
