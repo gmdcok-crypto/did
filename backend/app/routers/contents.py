@@ -119,11 +119,17 @@ async def upload_content_file(
             content, ext = optimize_image_bytes(content, ext)
         elif kind == "video" and ext in {".mp4", ".webm", ".ogg", ".mov", ".m4v"}:
             import asyncio
-            from app.video_optimize import optimize_video_bytes_safe
+            from app.video_optimize import VideoOptimizeError, optimize_video_bytes_safe
 
             # ffmpeg 변환은 CPU 부하 — 이벤트 루프 블로킹 방지
-            content, ext = await asyncio.to_thread(optimize_video_bytes_safe, content, ext)
+            # 실패 시 원본(4K 등)을 저장하지 않음 — TOX3 끊김 방지
+            try:
+                content, ext = await asyncio.to_thread(optimize_video_bytes_safe, content, ext)
+            except VideoOptimizeError as ve:
+                raise HTTPException(status_code=400, detail=str(ve)) from ve
         url, key = upload_media_bytes(settings, content, ext)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
     filename = key.split("/")[-1] if "/" in key else key
