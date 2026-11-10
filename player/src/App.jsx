@@ -1017,7 +1017,11 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
       return
     }
     setPrevIndex(from)
-    const prevClearMs = item?.type === 'image' ? IMAGE_FADE_MS + 100 : 180
+    // 큰 이미지는 로딩이 길 수 있음 → 타이머로 이전 장을 지우지 않고 onReady 까지 유지
+    if (item?.type === 'image') {
+      return
+    }
+    const prevClearMs = 180
     clearPrevTimerRef.current = setTimeout(() => {
       clearPrevTimerRef.current = null
       setPrevIndex(null)
@@ -1310,6 +1314,8 @@ function MediaBlock({
         src={url}
         crossOrigin={mediaCrossOrigin}
         alt=""
+        decoding="async"
+        loading="eager"
         onLoad={(e) => {
           const el = e.target
           reportIntrinsic(el.naturalWidth, el.naturalHeight)
@@ -1318,6 +1324,7 @@ function MediaBlock({
         onError={() => {
           logMediaLoadFailure('image', logId, url)
           if (contentIdInt != null) reportEvent(contentIdInt, 'error')
+          onReady?.()
         }}
       />
     )
