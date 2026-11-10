@@ -31,15 +31,12 @@ const DEVICE_NOT_FOUND_CONFIRM_DELAY_MS = 900
 const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.png'
 const DEFAULT_NO_CONTENT_IMAGE_PORTRAIT = '/default-nature-portrait.png'
 
-/** R2 progressive 재생 우선: 버퍼링 중 reload 금지, 진짜 에러만 소스 재로드 */
-const VIDEO_STALL_NUDGE_MS = 10000
-const VIDEO_FREEZE_CHECK_MS = 5000
-const VIDEO_FREEZE_HITS_BEFORE_NUDGE = 4
+/** R2 + TOX3: 재생 대역폭 우선. reload/프리페치는 랙 유발 → play() keep-alive만 */
+const VIDEO_KEEPALIVE_MS = 4000
+const VIDEO_WAITING_NUDGE_MS = 7000
 const MAX_VIDEO_SOFT_RECOVERY = 2
-/** 다음 영상은 끝나기 직전에만 받아 R2 대역폭을 현재 재생과 안 뺏기게 */
-const NEXT_VIDEO_PREFETCH_RATIO = 0.78
-const LIVE_SCREEN_POLL_MS = 2500
-const LIVE_SCREEN_MANIFEST_MS = 1000
+const LIVE_SCREEN_POLL_MS = 8000
+const LIVE_SCREEN_MANIFEST_MS = 2000
 
 /** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
 const _mediaLoadErrLogged = new Set()
@@ -123,17 +120,50 @@ function nudgeVideoPlayback() {
   })
 }
 
-/** bfcache(뒤로가기 복원) 후 비디오·스케줄이 꼬이는 경우 */
+/** bfcache 복원 시 load()는 R2 재생을 끊으므로 play()만 재시도 */
 function recoverMediaAfterPageShow() {
-  if (typeof document === 'undefined') return
-  requestAnimationFrame(() => {
-    document.querySelectorAll('video.media-video').forEach((v) => {
-      try {
-        v.load()
-      } catch (_) {}
-      v.play?.().catch(() => {})
-    })
-  })
+  nudgeVideoPlayback()
+}
+
+function videoHasBufferedAhead(el, minSec = 0.35) {
+  if (!el) return false
+  try {
+    const t = el.currentTime || 0
+    const ranges = el.buffered
+    for (let i = 0; i < ranges.length; i += 1) {
+      if (ranges.start(i) <= t + 0.15 && ranges.end(i) >= t + minSec) return true
+    }
+  } catch (_) {}
+  return false
+}
+
+/** 스케줄 폴링 시 무거운 JSON.stringify 대신 재생에 영향 있는 필드만 비교 */
+function isSamePlayerSchedule(a, b) {
+  if (a === b) return true
+  if (!a || !b) return false
+  if (a.id !== b.id || a.layout_id !== b.layout_id) return false
+  if (String(a.updated_at || '') !== String(b.updated_at || '')) return false
+  const az = a.zones || []
+  const bz = b.zones || []
+  if (az.length !== bz.length) return false
+  for (let i = 0; i < az.length; i += 1) {
+    const za = az[i]
+    const zb = bz[i]
+    if ((za?.id ?? i) !== (zb?.id ?? i)) return false
+    if ((za?.content_type || '') !== (zb?.content_type || '')) return false
+    const ia = za?.items || []
+    const ib = zb?.items || []
+    if (ia.length !== ib.length) return false
+    for (let j = 0; j < ia.length; j += 1) {
+      const xa = ia[j]
+      const xb = ib[j]
+      if ((xa?.id ?? '') !== (xb?.id ?? '')) return false
+      if ((xa?.type || '') !== (xb?.type || '')) return false
+      if ((xa?.url || '') !== (xb?.url || '')) return false
+      if ((xa?.duration_sec ?? 0) !== (xb?.duration_sec ?? 0)) return false
+    }
+  }
+  return true
 }
 
 function summarizeScheduleZonesForDebug(schedule) {
@@ -257,12 +287,7 @@ export default function App() {
     try {
       setError(null)
       const data = await fetchSchedule(deviceId, forceRefresh ? { cacheBust: true } : {})
-      setSchedule((prev) => {
-        try {
-          if (prev && data && JSON.stringify(prev) === JSON.stringify(data)) return prev
-        } catch (_) {}
-        return data
-      })
+      setSchedule((prev) => (isSamePlayerSchedule(prev, data) ? prev : data))
       if (data) {
         saveScheduleToStorage(deviceId, data)
       }
@@ -891,7 +916,6 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   const items = zone?.items ?? []
   const [index, setIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(null)
-  const [prefetchNext, setPrefetchNext] = useState(false)
   const prevIndexRef = useRef(index)
   const clearPrevTimerRef = useRef(null)
   const livePayloadRef = useRef(null)
@@ -902,15 +926,6 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
 
   const advance = useCallback(() => {
     setIndex((i) => (len > 0 ? (i + 1) % len : 0))
-  }, [len])
-
-  useEffect(() => {
-    setPrefetchNext(false)
-  }, [index, item?.id])
-
-  const onNearEnd = useCallback(() => {
-    if (len <= 1) return
-    setPrefetchNext(true)
   }, [len])
 
   // 이미지·HTML 등: 슬롯 시간(duration_sec)마다 다음 미디어. 영상은 재생 끝(onEnded)에서만 넘김.
@@ -1028,7 +1043,6 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   }
 
   const prevItem = prevIndex != null ? items[prevIndex % items.length] : null
-  const nextItem = items[(index + 1) % items.length]
 
   return (
     <div className="zone">
@@ -1052,33 +1066,12 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
             onReady={clearPrevWhenReady}
             loop={singleVideoLoop}
             onVideoEnded={item?.type === 'video' && !singleVideoLoop ? advance : undefined}
-            onNearEnd={item?.type === 'video' && !singleVideoLoop ? onNearEnd : undefined}
             onIntrinsicSize={
               item?.type === 'video' || item?.type === 'image' ? onLiveIntrinsicSize : undefined
             }
           />
       </div>
-      {prefetchNext && nextItem && nextItem.type === 'video' && nextItem.id !== item?.id && (
-        <NextVideoPreload item={nextItem} mediaBaseUrl={mediaBaseUrl} />
-      )}
     </div>
-  )
-}
-
-function NextVideoPreload({ item, mediaBaseUrl }) {
-  const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
-  if (!url) return null
-  const xo = crossOriginForMediaUrl(url)
-  return (
-    <video
-      src={url}
-      crossOrigin={xo}
-      preload="auto"
-      muted
-      playsInline
-      style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
-      aria-hidden
-    />
   )
 }
 
@@ -1094,17 +1087,15 @@ function MediaBlock({
   mediaBaseUrl,
   onReady,
   onVideoEnded,
-  onNearEnd,
   onIntrinsicSize,
   loop = false,
 }) {
   const hasReported = useRef(false)
   const videoRef = useRef(null)
   const videoStallTimerRef = useRef(null)
-  const videoWatchdogRef = useRef(null)
+  const videoKeepAliveRef = useRef(null)
   const videoFreezeSnapRef = useRef(null)
   const videoWaitingRef = useRef(false)
-  const videoNearEndSentRef = useRef(false)
   const videoRecoveryCountRef = useRef(0)
   const videoErrorRecoverOnceRef = useRef(false)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
@@ -1121,11 +1112,11 @@ function MediaBlock({
 
   const nudgeVideoPlay = useCallback(() => {
     const el = videoRef.current
-    if (!el) return
+    if (!el || el.ended) return
     el.play?.().catch(() => {})
   }, [])
 
-  /** R2 progressive: 재생 중 src reload는 끊김 유발 → 에러 시에만 사용 */
+  /** 에러 시에만 소스 재로드 — 재생 중 reload는 랙/끊김의 주원인 */
   const recoverVideoSoft = useCallback((resumeAt = null) => {
     const el = videoRef.current
     if (!el || !url) return
@@ -1157,12 +1148,25 @@ function MediaBlock({
     } catch (_) {}
   }, [url, mediaCrossOrigin])
 
+  const armWaitingNudge = useCallback(() => {
+    videoWaitingRef.current = true
+    clearVideoStallTimer()
+    videoStallTimerRef.current = window.setTimeout(() => {
+      videoStallTimerRef.current = null
+      const v = videoRef.current
+      if (!v || v.ended) return
+      nudgeVideoPlay()
+    }, VIDEO_WAITING_NUDGE_MS)
+  }, [clearVideoStallTimer, nudgeVideoPlay])
+
   useEffect(() => {
     if (contentIdInt == null) return
     if (hasReported.current) return
     hasReported.current = true
-    reportEvent(contentIdInt, 'impression')
+    // 재생 시작 직후 이벤트 API가 R2와 대역폭 경쟁하지 않게 약간 지연
+    const t = window.setTimeout(() => reportEvent(contentIdInt, 'impression'), 2500)
     return () => {
+      clearTimeout(t)
       reportEvent(contentIdInt, 'complete')
     }
   }, [contentIdInt, reportEvent])
@@ -1171,7 +1175,6 @@ function MediaBlock({
     if (item?.type !== 'video' || !url) return
     const el = videoRef.current
     if (!el) return
-    videoNearEndSentRef.current = false
     const tryPlay = () => {
       el.play?.().catch(() => {})
     }
@@ -1180,49 +1183,42 @@ function MediaBlock({
     return () => el.removeEventListener('canplay', tryPlay)
   }, [item?.type, url])
 
-  /** 버퍼링은 그대로 두고, 디코더만 멈춘 경우 play()만 재시도 (R2 재다운로드 금지) */
+  /** 하나의 가벼운 keep-alive만 유지 (이중 워치독/강제 reload 제거 → 랙 감소) */
   useEffect(() => {
     if (item?.type !== 'video' || !url) return
     videoRecoveryCountRef.current = 0
     videoErrorRecoverOnceRef.current = false
     videoFreezeSnapRef.current = null
     videoWaitingRef.current = false
-    videoWatchdogRef.current = window.setInterval(() => {
+    videoKeepAliveRef.current = window.setInterval(() => {
       const v = videoRef.current
-      if (!v || v.paused || v.ended || v.seeking || videoWaitingRef.current) {
-        videoFreezeSnapRef.current = null
+      if (!v || v.ended || v.seeking) return
+      if (v.paused) {
+        nudgeVideoPlay()
         return
       }
-      if (v.readyState < 3 || v.networkState === 2) {
-        videoFreezeSnapRef.current = null
+      if (videoWaitingRef.current && videoHasBufferedAhead(v)) {
+        videoWaitingRef.current = false
+        nudgeVideoPlay()
         return
       }
       const t = v.currentTime
       const snap = videoFreezeSnapRef.current
       if (snap != null && Math.abs(t - snap.t) < 0.05) {
-        const hits = (snap.hits || 1) + 1
-        if (hits >= VIDEO_FREEZE_HITS_BEFORE_NUDGE) {
-          nudgeVideoPlay()
-          videoFreezeSnapRef.current = null
-        } else {
-          videoFreezeSnapRef.current = { t: snap.t, hits }
-        }
+        if (videoHasBufferedAhead(v) || v.readyState >= 2) nudgeVideoPlay()
       } else {
-        videoFreezeSnapRef.current = { t, hits: 1 }
+        videoFreezeSnapRef.current = { t }
       }
-    }, VIDEO_FREEZE_CHECK_MS)
+    }, VIDEO_KEEPALIVE_MS)
     return () => {
-      if (videoWatchdogRef.current != null) {
-        clearInterval(videoWatchdogRef.current)
-        videoWatchdogRef.current = null
+      if (videoKeepAliveRef.current != null) {
+        clearInterval(videoKeepAliveRef.current)
+        videoKeepAliveRef.current = null
       }
       videoFreezeSnapRef.current = null
+      clearVideoStallTimer()
     }
-  }, [item?.type, url, nudgeVideoPlay])
-
-  useEffect(() => {
-    return () => clearVideoStallTimer()
-  }, [clearVideoStallTimer])
+  }, [item?.type, url, nudgeVideoPlay, clearVideoStallTimer])
 
   const reportIntrinsic = useCallback(
     (w, h) => {
@@ -1275,31 +1271,20 @@ function MediaBlock({
           videoWaitingRef.current = false
           clearVideoStallTimer()
         }}
-        onTimeUpdate={(e) => {
+        onTimeUpdate={() => {
           videoWaitingRef.current = false
           clearVideoStallTimer()
-          if (!onNearEnd || videoNearEndSentRef.current) return
-          const el = e.currentTarget
-          const dur = el.duration
-          if (!(dur > 0)) return
-          if (el.currentTime / dur >= NEXT_VIDEO_PREFETCH_RATIO) {
-            videoNearEndSentRef.current = true
-            onNearEnd()
-          }
         }}
         onWaiting={() => {
-          videoWaitingRef.current = true
-          clearVideoStallTimer()
+          armWaitingNudge()
         }}
         onStalled={() => {
-          videoWaitingRef.current = true
-          clearVideoStallTimer()
-          videoStallTimerRef.current = window.setTimeout(() => {
-            videoStallTimerRef.current = null
-            const v = videoRef.current
-            if (!v || v.paused || v.ended || v.seeking) return
-            nudgeVideoPlay()
-          }, VIDEO_STALL_NUDGE_MS)
+          armWaitingNudge()
+        }}
+        onSuspend={() => {
+          const v = videoRef.current
+          if (!v || v.ended) return
+          if (v.paused || videoHasBufferedAhead(v)) nudgeVideoPlay()
         }}
         onEnded={() => onVideoEnded?.()}
         onError={() => {

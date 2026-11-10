@@ -282,6 +282,9 @@ body {
 
 .media-video {
   display: block;
+  /* TOX3: 합성 레이어로 올려 디코딩 끊김/랙 완화 */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .media-image {
