@@ -20,6 +20,7 @@ import {
   hardResetPlayerCaches,
 } from './lib/api'
 import { crossOriginForMediaUrl } from './lib/mediaCrossOrigin'
+import { resolveVideoPlaySource } from './lib/videoSource'
 
 /** 스케줄 폴링 — last_seen 갱신 주기(오프라인 판정과 맞춤, 기본 2분) */
 const POLL_INTERVAL_MS = 2 * 60 * 1000
@@ -31,11 +32,9 @@ const DEVICE_NOT_FOUND_CONFIRM_DELAY_MS = 900
 const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.png'
 const DEFAULT_NO_CONTENT_IMAGE_PORTRAIT = '/default-nature-portrait.png'
 
-/** R2 + TOX3: 재생 대역폭 우선. reload/프리페치는 랙 유발 → play() keep-alive만 */
-const VIDEO_KEEPALIVE_MS = 4000
-const VIDEO_WAITING_NUDGE_MS = 7000
-const MAX_VIDEO_SOFT_RECOVERY = 2
-const LIVE_SCREEN_POLL_MS = 8000
+/** R2 + TOX3: 재생 중 부가 트래픽 최소화 */
+const VIDEO_WAITING_NUDGE_MS = 8000
+const LIVE_SCREEN_POLL_MS = 30000
 const LIVE_SCREEN_MANIFEST_MS = 2000
 
 /** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
@@ -1093,11 +1092,11 @@ function MediaBlock({
   const hasReported = useRef(false)
   const videoRef = useRef(null)
   const videoStallTimerRef = useRef(null)
-  const videoKeepAliveRef = useRef(null)
-  const videoFreezeSnapRef = useRef(null)
   const videoWaitingRef = useRef(false)
-  const videoRecoveryCountRef = useRef(0)
   const videoErrorRecoverOnceRef = useRef(false)
+  const videoRevokeRef = useRef(null)
+  const [playSrc, setPlaySrc] = useState('')
+  const [videoPreparing, setVideoPreparing] = useState(false)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
   const mediaCrossOrigin = crossOriginForMediaUrl(url)
   const contentIdInt = parseContentIdForEvents(item?.id)
@@ -1116,38 +1115,6 @@ function MediaBlock({
     el.play?.().catch(() => {})
   }, [])
 
-  /** 에러 시에만 소스 재로드 — 재생 중 reload는 랙/끊김의 주원인 */
-  const recoverVideoSoft = useCallback((resumeAt = null) => {
-    const el = videoRef.current
-    if (!el || !url) return
-    if (videoRecoveryCountRef.current >= MAX_VIDEO_SOFT_RECOVERY) return
-    videoRecoveryCountRef.current += 1
-    const resume =
-      typeof resumeAt === 'number' && Number.isFinite(resumeAt) && resumeAt > 0
-        ? resumeAt
-        : Math.max(0, el.currentTime || 0)
-    try {
-      const u = url
-      el.pause()
-      el.removeAttribute('src')
-      el.load()
-      if (mediaCrossOrigin) el.crossOrigin = mediaCrossOrigin
-      else el.removeAttribute('crossOrigin')
-      el.src = u
-      const resumeWhenReady = () => {
-        el.removeEventListener('loadedmetadata', resumeWhenReady)
-        try {
-          if (resume > 0.25 && Number.isFinite(el.duration) && resume < el.duration - 0.3) {
-            el.currentTime = resume
-          }
-        } catch (_) {}
-        el.play().catch(() => {})
-      }
-      el.addEventListener('loadedmetadata', resumeWhenReady)
-      el.load()
-    } catch (_) {}
-  }, [url, mediaCrossOrigin])
-
   const armWaitingNudge = useCallback(() => {
     videoWaitingRef.current = true
     clearVideoStallTimer()
@@ -1163,16 +1130,52 @@ function MediaBlock({
     if (contentIdInt == null) return
     if (hasReported.current) return
     hasReported.current = true
-    // 재생 시작 직후 이벤트 API가 R2와 대역폭 경쟁하지 않게 약간 지연
-    const t = window.setTimeout(() => reportEvent(contentIdInt, 'impression'), 2500)
+    const t = window.setTimeout(() => reportEvent(contentIdInt, 'impression'), 3000)
     return () => {
       clearTimeout(t)
       reportEvent(contentIdInt, 'complete')
     }
   }, [contentIdInt, reportEvent])
 
+  /** R2는 가능하면 blob 로컬 재생(버벅임 감소). CORS 실패 시 원격 progressive 폴백 */
   useEffect(() => {
-    if (item?.type !== 'video' || !url) return
+    if (item?.type !== 'video' || !url) {
+      setPlaySrc('')
+      setVideoPreparing(false)
+      return undefined
+    }
+    let cancelled = false
+    const ac = new AbortController()
+    setVideoPreparing(true)
+    setPlaySrc('')
+    videoErrorRecoverOnceRef.current = false
+    ;(async () => {
+      const resolved = await resolveVideoPlaySource(url, { signal: ac.signal })
+      if (cancelled) {
+        resolved.revoke?.()
+        return
+      }
+      if (videoRevokeRef.current) {
+        videoRevokeRef.current()
+        videoRevokeRef.current = null
+      }
+      if (resolved.revoke) videoRevokeRef.current = resolved.revoke
+      setPlaySrc(resolved.src || url)
+      setVideoPreparing(false)
+    })()
+    return () => {
+      cancelled = true
+      ac.abort()
+      if (videoRevokeRef.current) {
+        videoRevokeRef.current()
+        videoRevokeRef.current = null
+      }
+      clearVideoStallTimer()
+    }
+  }, [item?.type, url, clearVideoStallTimer])
+
+  useEffect(() => {
+    if (item?.type !== 'video' || !playSrc) return
     const el = videoRef.current
     if (!el) return
     const tryPlay = () => {
@@ -1181,44 +1184,7 @@ function MediaBlock({
     tryPlay()
     el.addEventListener('canplay', tryPlay)
     return () => el.removeEventListener('canplay', tryPlay)
-  }, [item?.type, url])
-
-  /** 하나의 가벼운 keep-alive만 유지 (이중 워치독/강제 reload 제거 → 랙 감소) */
-  useEffect(() => {
-    if (item?.type !== 'video' || !url) return
-    videoRecoveryCountRef.current = 0
-    videoErrorRecoverOnceRef.current = false
-    videoFreezeSnapRef.current = null
-    videoWaitingRef.current = false
-    videoKeepAliveRef.current = window.setInterval(() => {
-      const v = videoRef.current
-      if (!v || v.ended || v.seeking) return
-      if (v.paused) {
-        nudgeVideoPlay()
-        return
-      }
-      if (videoWaitingRef.current && videoHasBufferedAhead(v)) {
-        videoWaitingRef.current = false
-        nudgeVideoPlay()
-        return
-      }
-      const t = v.currentTime
-      const snap = videoFreezeSnapRef.current
-      if (snap != null && Math.abs(t - snap.t) < 0.05) {
-        if (videoHasBufferedAhead(v) || v.readyState >= 2) nudgeVideoPlay()
-      } else {
-        videoFreezeSnapRef.current = { t }
-      }
-    }, VIDEO_KEEPALIVE_MS)
-    return () => {
-      if (videoKeepAliveRef.current != null) {
-        clearInterval(videoKeepAliveRef.current)
-        videoKeepAliveRef.current = null
-      }
-      videoFreezeSnapRef.current = null
-      clearVideoStallTimer()
-    }
-  }, [item?.type, url, nudgeVideoPlay, clearVideoStallTimer])
+  }, [item?.type, playSrc])
 
   const reportIntrinsic = useCallback(
     (w, h) => {
@@ -1243,11 +1209,18 @@ function MediaBlock({
         </div>
       )
     }
+    if (videoPreparing && !playSrc) {
+      return (
+        <div className="zone-placeholder">
+          <span>동영상 준비 중…</span>
+        </div>
+      )
+    }
     return (
       <video
         ref={videoRef}
         className="media media-video"
-        src={url}
+        src={playSrc || url}
         crossOrigin={mediaCrossOrigin}
         autoPlay
         muted
@@ -1288,14 +1261,11 @@ function MediaBlock({
         }}
         onEnded={() => onVideoEnded?.()}
         onError={() => {
+          logMediaLoadFailure('video', logId, playSrc || url)
           if (contentIdInt != null) reportEvent(contentIdInt, 'error')
-          if (
-            !videoErrorRecoverOnceRef.current &&
-            videoRecoveryCountRef.current < MAX_VIDEO_SOFT_RECOVERY
-          ) {
+          if (!videoErrorRecoverOnceRef.current && playSrc && playSrc !== url) {
             videoErrorRecoverOnceRef.current = true
-            const v = videoRef.current
-            recoverVideoSoft(v?.currentTime || 0)
+            setPlaySrc(url)
             return
           }
           onVideoEnded?.()
