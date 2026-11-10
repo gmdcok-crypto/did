@@ -31,10 +31,15 @@ const DEVICE_NOT_FOUND_CONFIRM_DELAY_MS = 900
 const DEFAULT_NO_CONTENT_IMAGE = '/default-nature.png'
 const DEFAULT_NO_CONTENT_IMAGE_PORTRAIT = '/default-nature-portrait.png'
 
-/** PC 브라우저에서 디코더가 멈춘 뒤 네트워크만 진행되는 경우 완화 — 과도한 재시도 방지 */
-const VIDEO_STALL_RECOVER_MS = 4000
+/** R2 progressive 재생 우선: 버퍼링 중 reload 금지, 진짜 에러만 소스 재로드 */
+const VIDEO_STALL_NUDGE_MS = 10000
 const VIDEO_FREEZE_CHECK_MS = 5000
-const MAX_VIDEO_SOFT_RECOVERY = 8
+const VIDEO_FREEZE_HITS_BEFORE_NUDGE = 4
+const MAX_VIDEO_SOFT_RECOVERY = 2
+/** 다음 영상은 끝나기 직전에만 받아 R2 대역폭을 현재 재생과 안 뺏기게 */
+const NEXT_VIDEO_PREFETCH_RATIO = 0.78
+const LIVE_SCREEN_POLL_MS = 2500
+const LIVE_SCREEN_MANIFEST_MS = 1000
 
 /** img/video는 onError에 HTTP 상태가 없음 — 동일 URL은 한 번만 콘솔에 남김 */
 const _mediaLoadErrLogged = new Set()
@@ -252,7 +257,12 @@ export default function App() {
     try {
       setError(null)
       const data = await fetchSchedule(deviceId, forceRefresh ? { cacheBust: true } : {})
-      setSchedule(data)
+      setSchedule((prev) => {
+        try {
+          if (prev && data && JSON.stringify(prev) === JSON.stringify(data)) return prev
+        } catch (_) {}
+        return data
+      })
       if (data) {
         saveScheduleToStorage(deviceId, data)
       }
@@ -472,7 +482,7 @@ export default function App() {
           if (cancelled) return
           liveScreenWsRef.current = ws
           if (frameTimer) clearInterval(frameTimer)
-          frameTimer = setInterval(sendManifest, 400)
+          frameTimer = setInterval(sendManifest, LIVE_SCREEN_MANIFEST_MS)
           sendManifest()
         }
         ws.onerror = () => {
@@ -491,7 +501,8 @@ export default function App() {
     }
 
     liveScreenTickRef.current = tick
-    pollTimer = setInterval(tick, 400)
+    // TOX3: 실시간화면 미사용 시에도 400ms 폴링하면 R2 재생 대역을 갉아먹음
+    pollTimer = setInterval(tick, LIVE_SCREEN_POLL_MS)
     tick()
     return () => {
       cancelled = true
@@ -880,15 +891,26 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   const items = zone?.items ?? []
   const [index, setIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(null)
+  const [prefetchNext, setPrefetchNext] = useState(false)
   const prevIndexRef = useRef(index)
   const clearPrevTimerRef = useRef(null)
   const livePayloadRef = useRef(null)
   const len = items.length
   const item = len > 0 ? items[index % len] : undefined
   const duration = (item?.duration_sec || 10) * 1000
+  const singleVideoLoop = len === 1 && item?.type === 'video'
 
   const advance = useCallback(() => {
     setIndex((i) => (len > 0 ? (i + 1) % len : 0))
+  }, [len])
+
+  useEffect(() => {
+    setPrefetchNext(false)
+  }, [index, item?.id])
+
+  const onNearEnd = useCallback(() => {
+    if (len <= 1) return
+    setPrefetchNext(true)
   }, [len])
 
   // 이미지·HTML 등: 슬롯 시간(duration_sec)마다 다음 미디어. 영상은 재생 끝(onEnded)에서만 넘김.
@@ -963,25 +985,33 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
   ])
 
   useEffect(() => {
-    if (prevIndexRef.current !== index) {
-      setPrevIndex(prevIndexRef.current)
-      prevIndexRef.current = index
-      if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
-      const isVideo = item?.type === 'video'
-      const prevClearMs = isVideo
-        ? 8000
-        : item?.type === 'image'
-          ? IMAGE_FADE_MS + 100
-          : 180
-      clearPrevTimerRef.current = setTimeout(() => {
-        clearPrevTimerRef.current = null
-        setPrevIndex(null)
-      }, prevClearMs)
-      return () => {
-        if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
-      }
+    if (prevIndexRef.current === index) return
+    const from = prevIndexRef.current
+    prevIndexRef.current = index
+    if (clearPrevTimerRef.current) {
+      clearTimeout(clearPrevTimerRef.current)
+      clearPrevTimerRef.current = null
     }
-  }, [index, item?.type])
+    // 동영상 전환 시 이전/현재 영상을 동시에 디코딩하지 않음
+    if (item?.type === 'video') {
+      setPrevIndex(null)
+      return
+    }
+    const prevType = items[from % (items.length || 1)]?.type
+    if (prevType === 'video') {
+      setPrevIndex(null)
+      return
+    }
+    setPrevIndex(from)
+    const prevClearMs = item?.type === 'image' ? IMAGE_FADE_MS + 100 : 180
+    clearPrevTimerRef.current = setTimeout(() => {
+      clearPrevTimerRef.current = null
+      setPrevIndex(null)
+    }, prevClearMs)
+    return () => {
+      if (clearPrevTimerRef.current) clearTimeout(clearPrevTimerRef.current)
+    }
+  }, [index, item?.type, items])
 
   // 백엔드는 빈 존에도 content_type은 video 등으로 두고 items만 placeholder로 채움
   if (
@@ -1002,7 +1032,7 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
 
   return (
     <div className="zone">
-      {prevItem && prevItem.id !== item?.id && (
+      {prevItem && prevItem.id !== item?.id && prevItem.type !== 'video' && item?.type !== 'video' && (
         <div className="media-wrap media-wrap-prev">
           <MediaBlock
             item={prevItem}
@@ -1020,13 +1050,15 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
             reportEvent={reportEvent}
             mediaBaseUrl={mediaBaseUrl}
             onReady={clearPrevWhenReady}
-            onVideoEnded={item?.type === 'video' ? advance : undefined}
+            loop={singleVideoLoop}
+            onVideoEnded={item?.type === 'video' && !singleVideoLoop ? advance : undefined}
+            onNearEnd={item?.type === 'video' && !singleVideoLoop ? onNearEnd : undefined}
             onIntrinsicSize={
               item?.type === 'video' || item?.type === 'image' ? onLiveIntrinsicSize : undefined
             }
           />
       </div>
-      {nextItem && nextItem.type === 'video' && nextItem.id !== item?.id && (
+      {prefetchNext && nextItem && nextItem.type === 'video' && nextItem.id !== item?.id && (
         <NextVideoPreload item={nextItem} mediaBaseUrl={mediaBaseUrl} />
       )}
     </div>
@@ -1056,12 +1088,23 @@ function parseContentIdForEvents(id) {
   return null
 }
 
-function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, onIntrinsicSize }) {
+function MediaBlock({
+  item,
+  reportEvent,
+  mediaBaseUrl,
+  onReady,
+  onVideoEnded,
+  onNearEnd,
+  onIntrinsicSize,
+  loop = false,
+}) {
   const hasReported = useRef(false)
   const videoRef = useRef(null)
   const videoStallTimerRef = useRef(null)
   const videoWatchdogRef = useRef(null)
   const videoFreezeSnapRef = useRef(null)
+  const videoWaitingRef = useRef(false)
+  const videoNearEndSentRef = useRef(false)
   const videoRecoveryCountRef = useRef(0)
   const videoErrorRecoverOnceRef = useRef(false)
   const url = (item?.url && item.url.startsWith('/uploads')) ? (mediaBaseUrl || '') + item.url : (item?.url || '')
@@ -1076,11 +1119,22 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
     }
   }, [])
 
-  const recoverVideoSoft = useCallback(() => {
+  const nudgeVideoPlay = useCallback(() => {
+    const el = videoRef.current
+    if (!el) return
+    el.play?.().catch(() => {})
+  }, [])
+
+  /** R2 progressive: 재생 중 src reload는 끊김 유발 → 에러 시에만 사용 */
+  const recoverVideoSoft = useCallback((resumeAt = null) => {
     const el = videoRef.current
     if (!el || !url) return
     if (videoRecoveryCountRef.current >= MAX_VIDEO_SOFT_RECOVERY) return
     videoRecoveryCountRef.current += 1
+    const resume =
+      typeof resumeAt === 'number' && Number.isFinite(resumeAt) && resumeAt > 0
+        ? resumeAt
+        : Math.max(0, el.currentTime || 0)
     try {
       const u = url
       el.pause()
@@ -1089,8 +1143,17 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
       if (mediaCrossOrigin) el.crossOrigin = mediaCrossOrigin
       else el.removeAttribute('crossOrigin')
       el.src = u
+      const resumeWhenReady = () => {
+        el.removeEventListener('loadedmetadata', resumeWhenReady)
+        try {
+          if (resume > 0.25 && Number.isFinite(el.duration) && resume < el.duration - 0.3) {
+            el.currentTime = resume
+          }
+        } catch (_) {}
+        el.play().catch(() => {})
+      }
+      el.addEventListener('loadedmetadata', resumeWhenReady)
       el.load()
-      el.play().catch(() => {})
     } catch (_) {}
   }, [url, mediaCrossOrigin])
 
@@ -1108,6 +1171,7 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
     if (item?.type !== 'video' || !url) return
     const el = videoRef.current
     if (!el) return
+    videoNearEndSentRef.current = false
     const tryPlay = () => {
       el.play?.().catch(() => {})
     }
@@ -1116,26 +1180,35 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
     return () => el.removeEventListener('canplay', tryPlay)
   }, [item?.type, url])
 
-  /** 재생 중 currentTime이 오래 멈춰 있으면(디코더 멈춤 추정) 소프트 리로드 */
+  /** 버퍼링은 그대로 두고, 디코더만 멈춘 경우 play()만 재시도 (R2 재다운로드 금지) */
   useEffect(() => {
     if (item?.type !== 'video' || !url) return
     videoRecoveryCountRef.current = 0
     videoErrorRecoverOnceRef.current = false
     videoFreezeSnapRef.current = null
+    videoWaitingRef.current = false
     videoWatchdogRef.current = window.setInterval(() => {
       const v = videoRef.current
-      if (!v || v.paused || v.ended) {
+      if (!v || v.paused || v.ended || v.seeking || videoWaitingRef.current) {
         videoFreezeSnapRef.current = null
         return
       }
-      if (v.readyState < 2) return
+      if (v.readyState < 3 || v.networkState === 2) {
+        videoFreezeSnapRef.current = null
+        return
+      }
       const t = v.currentTime
       const snap = videoFreezeSnapRef.current
-      if (snap != null && Math.abs(t - snap.t) < 0.03) {
-        recoverVideoSoft()
-        videoFreezeSnapRef.current = null
+      if (snap != null && Math.abs(t - snap.t) < 0.05) {
+        const hits = (snap.hits || 1) + 1
+        if (hits >= VIDEO_FREEZE_HITS_BEFORE_NUDGE) {
+          nudgeVideoPlay()
+          videoFreezeSnapRef.current = null
+        } else {
+          videoFreezeSnapRef.current = { t: snap.t, hits }
+        }
       } else {
-        videoFreezeSnapRef.current = { t }
+        videoFreezeSnapRef.current = { t, hits: 1 }
       }
     }, VIDEO_FREEZE_CHECK_MS)
     return () => {
@@ -1145,7 +1218,7 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
       }
       videoFreezeSnapRef.current = null
     }
-  }, [item?.type, url, recoverVideoSoft])
+  }, [item?.type, url, nudgeVideoPlay])
 
   useEffect(() => {
     return () => clearVideoStallTimer()
@@ -1183,7 +1256,10 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
         autoPlay
         muted
         playsInline
+        loop={loop}
         preload="auto"
+        controls={false}
+        disablePictureInPicture
         onLoadedMetadata={(e) => {
           const el = e.target
           reportIntrinsic(el.videoWidth, el.videoHeight)
@@ -1191,20 +1267,39 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
         onCanPlay={() => onReady?.()}
         onLoadedData={() => onReady?.()}
         onPlay={() => {
+          videoWaitingRef.current = false
           clearVideoStallTimer()
           onReady?.()
         }}
-        onPlaying={() => clearVideoStallTimer()}
-        onTimeUpdate={() => clearVideoStallTimer()}
-        onWaiting={() => clearVideoStallTimer()}
+        onPlaying={() => {
+          videoWaitingRef.current = false
+          clearVideoStallTimer()
+        }}
+        onTimeUpdate={(e) => {
+          videoWaitingRef.current = false
+          clearVideoStallTimer()
+          if (!onNearEnd || videoNearEndSentRef.current) return
+          const el = e.currentTarget
+          const dur = el.duration
+          if (!(dur > 0)) return
+          if (el.currentTime / dur >= NEXT_VIDEO_PREFETCH_RATIO) {
+            videoNearEndSentRef.current = true
+            onNearEnd()
+          }
+        }}
+        onWaiting={() => {
+          videoWaitingRef.current = true
+          clearVideoStallTimer()
+        }}
         onStalled={() => {
+          videoWaitingRef.current = true
           clearVideoStallTimer()
           videoStallTimerRef.current = window.setTimeout(() => {
             videoStallTimerRef.current = null
             const v = videoRef.current
-            if (!v || v.paused || v.ended) return
-            recoverVideoSoft()
-          }, VIDEO_STALL_RECOVER_MS)
+            if (!v || v.paused || v.ended || v.seeking) return
+            nudgeVideoPlay()
+          }, VIDEO_STALL_NUDGE_MS)
         }}
         onEnded={() => onVideoEnded?.()}
         onError={() => {
@@ -1214,7 +1309,8 @@ function MediaBlock({ item, reportEvent, mediaBaseUrl, onReady, onVideoEnded, on
             videoRecoveryCountRef.current < MAX_VIDEO_SOFT_RECOVERY
           ) {
             videoErrorRecoverOnceRef.current = true
-            recoverVideoSoft()
+            const v = videoRef.current
+            recoverVideoSoft(v?.currentTime || 0)
             return
           }
           onVideoEnded?.()

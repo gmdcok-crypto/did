@@ -89,21 +89,37 @@ export default defineConfig({
             urlPattern: /\/api\/player\/live-screen-poll/,
             handler: 'NetworkOnly',
           },
+          // R2/동영상: SW가 Range 요청을 가로채면 TOX3에서 버퍼링·끊김 → 브라우저 직접 스트리밍
           {
-            urlPattern: /\/uploads\//,
-            handler: 'NetworkFirst',
+            urlPattern: /^https:\/\/[^/]*\.r2\.dev\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /^https:\/\/[^/]*\.cloudflarestorage\.com\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\.(?:mp4|webm|ogg|m4v)(?:\?.*)?$/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/uploads\/.*\.(?:mp4|webm|ogg|m4v)(?:\?.*)?$/i,
+            handler: 'NetworkOnly',
+          },
+          // 이미지만 캐시 (동영상 제외)
+          {
+            urlPattern: /\/uploads\/.*\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?.*)?$/i,
+            handler: 'CacheFirst',
             options: {
-              cacheName: 'uploads-cache',
-              networkTimeoutSeconds: 5,
+              cacheName: 'uploads-image-cache',
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
           {
-            urlPattern: /\.(?:mp4|webm|jpg|jpeg|png|gif|webp)$/,
-            handler: 'NetworkFirst',
+            urlPattern: /\.(?:jpg|jpeg|png|gif|webp)(?:\?.*)?$/i,
+            handler: 'CacheFirst',
             options: {
-              cacheName: 'media-cache',
-              networkTimeoutSeconds: 5,
+              cacheName: 'media-image-cache',
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
