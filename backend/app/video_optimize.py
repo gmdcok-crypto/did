@@ -12,11 +12,11 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# 잘 재생되던 medium 샘플(~2Mbps/720p)보다 조금 더 보수적으로
-MAX_HEIGHT = 720
-TARGET_MAXRATE = "1800k"
-TARGET_BUFSIZE = "3600k"
-TARGET_FPS = "30"
+# TOX3: 720p/2Mbps도 남는 끊김이 있어 한 단계 더 낮춤
+MAX_HEIGHT = 540
+TARGET_MAXRATE = "1200k"
+TARGET_BUFSIZE = "2400k"
+TARGET_FPS = "24"
 FFMPEG_TIMEOUT_SEC = 900
 
 
@@ -117,7 +117,7 @@ def optimize_video_bytes(body: bytes, ext: str) -> VideoOptimizeResult:
             "-preset",
             "veryfast",
             "-crf",
-            "24",
+            "26",
             "-maxrate",
             TARGET_MAXRATE,
             "-bufsize",
@@ -125,7 +125,7 @@ def optimize_video_bytes(body: bytes, ext: str) -> VideoOptimizeResult:
             "-profile:v",
             "baseline",
             "-level",
-            "3.1",
+            "3.0",
             "-pix_fmt",
             "yuv420p",
             "-an",
