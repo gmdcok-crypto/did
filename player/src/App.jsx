@@ -1047,10 +1047,23 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
 
   const prevItem = prevIndex != null ? items[prevIndex % items.length] : null
   const nextItem = items[(index + 1) % items.length]
+  const playingVideo = item?.type === 'video'
+  // TOX3: 동영상 재생 중엔 이전/다음 미디어를 동시에 받지 않음 (여러 파일일수록 끊김 커짐)
+  const showPrevLayer =
+    !playingVideo &&
+    !isLowPowerPlayer() &&
+    prevItem &&
+    prevItem.id !== item?.id &&
+    prevItem.type !== 'video'
+  const prefetchNextImage =
+    !playingVideo &&
+    nextItem &&
+    nextItem.type === 'image' &&
+    nextItem.id !== item?.id
 
   return (
     <div className="zone">
-      {prevItem && prevItem.id !== item?.id && prevItem.type !== 'video' && (
+      {showPrevLayer && (
         <div className="media-wrap media-wrap-prev">
           <MediaBlock
             item={prevItem}
@@ -1075,14 +1088,14 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
             }
           />
       </div>
-      {nextItem && nextItem.type === 'image' && nextItem.id !== item?.id && (
+      {prefetchNextImage && (
         <NextImagePreload item={nextItem} mediaBaseUrl={mediaBaseUrl} />
       )}
     </div>
   )
 }
 
-/** 다음 이미지만 미리 받아 TOX3 전환 지연 완화 (동영상 프리페치는 대역폭 때문에 하지 않음) */
+/** 이미지→이미지 전환용만. 동영상 재생 중에는 호출하지 않음 */
 function NextImagePreload({ item, mediaBaseUrl }) {
   const url =
     item?.url && item.url.startsWith('/uploads')
