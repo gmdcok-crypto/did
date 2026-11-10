@@ -1006,13 +1006,13 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
       clearTimeout(clearPrevTimerRef.current)
       clearPrevTimerRef.current = null
     }
-    // 동영상 전환 시 이전/현재 영상을 동시에 디코딩하지 않음
-    if (item?.type === 'video') {
+    const prevType = items[from % (items.length || 1)]?.type
+    // 이전/현재가 둘 다 영상이면 이중 디코딩 방지. 이미지→영상은 이전 이미지 유지(깜빡임 방지)
+    if (item?.type === 'video' && prevType === 'video') {
       setPrevIndex(null)
       return
     }
-    const prevType = items[from % (items.length || 1)]?.type
-    if (prevType === 'video') {
+    if (prevType === 'video' && item?.type !== 'image') {
       setPrevIndex(null)
       return
     }
@@ -1050,7 +1050,7 @@ function Zone({ zone, reportEvent, mediaBaseUrl, onLiveZoneMedia }) {
 
   return (
     <div className="zone">
-      {prevItem && prevItem.id !== item?.id && prevItem.type !== 'video' && item?.type !== 'video' && (
+      {prevItem && prevItem.id !== item?.id && prevItem.type !== 'video' && (
         <div className="media-wrap media-wrap-prev">
           <MediaBlock
             item={prevItem}
@@ -1166,8 +1166,8 @@ function MediaBlock({
   }, [contentIdInt, reportEvent])
 
   /**
-   * TOX3: 무조건 원격 URL로 즉시 재생 시작(준비 대기 없음).
-   * 캐시 hit 이 있으면 빠른 전환만 하고, 전체 다운로드 대기는 하지 않음.
+   * 재생 중 src를 바꾸면(원격→blob) 영상이 잠깐 나왔다가 처음부터 다시 재생됨.
+   * 캐시 hit만 먼저 확인하고, 한 번 정한 src는 이번 슬롯에서 바꾸지 않음.
    */
   useEffect(() => {
     if (item?.type !== 'video' || !url) {
@@ -1177,24 +1177,23 @@ function MediaBlock({
     let cancelled = false
     const ac = new AbortController()
     videoErrorRecoverOnceRef.current = false
-    setPlaySrc(url)
+    setPlaySrc('')
     ;(async () => {
       const resolved = await resolveVideoPlaySource(url, {
         signal: ac.signal,
-        cacheOnly: isLowPowerPlayer(),
-        forceRemote: false,
+        cacheOnly: true,
       })
       if (cancelled) {
         resolved.revoke?.()
         return
       }
-      if (!resolved.local) return
       if (videoRevokeRef.current) {
         videoRevokeRef.current()
         videoRevokeRef.current = null
       }
-      if (resolved.revoke) videoRevokeRef.current = resolved.revoke
-      setPlaySrc(resolved.src || url)
+      if (resolved.local && resolved.revoke) videoRevokeRef.current = resolved.revoke
+      // local 캐시 없으면 원격 URL 고정 — 재생 도중 blob으로 갈아타지 않음
+      setPlaySrc(resolved.local ? resolved.src : url)
     })()
     return () => {
       cancelled = true
@@ -1242,11 +1241,15 @@ function MediaBlock({
         </div>
       )
     }
+    // playSrc 확정 전엔 비움 — 원격→blob 이중 재생 방지. 이전 이미지가 아래 레이어로 유지됨
+    if (!playSrc) {
+      return <div className="media media-video" aria-hidden />
+    }
     return (
       <video
         ref={videoRef}
         className="media media-video"
-        src={playSrc || url}
+        src={playSrc}
         crossOrigin={mediaCrossOrigin}
         autoPlay
         muted
