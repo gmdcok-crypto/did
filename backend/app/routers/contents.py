@@ -144,8 +144,9 @@ async def upload_content_file(
             width, height = result.width, result.height
             duration_sec = result.duration_sec
             message = (
-                f"TOX3 최적화 완료: {width or '?'}x{height or '?'} / "
-                f"{max(1, len(content) // 1024)}KB"
+                f"TOX3 프로파일 최적화 완료: {width or '?'}x{height or '?'} / "
+                f"{max(1, len(content) // 1024)}KB "
+                f"(목표 720p·최대 1.6Mbps)"
             )
         url, key = upload_media_bytes(settings, content, ext)
     except HTTPException:

@@ -1,4 +1,8 @@
-"""DID/TOX3용 동영상 최적화: 업로드 시 H.264 720p·저비트레이트·faststart·무음 MP4로 변환."""
+"""DID/TOX3용 동영상 최적화.
+
+TOX3는 4K 출력 지원이어도, PWA+R2 progressive 재생에서는
+검증된 샘플(1280x720 / ~2Mbps H.264) 수준이 가장 안정적이다.
+"""
 
 from __future__ import annotations
 
@@ -12,11 +16,11 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# TOX3: 720p/2Mbps도 남는 끊김이 있어 한 단계 더 낮춤
-MAX_HEIGHT = 540
-TARGET_MAXRATE = "1200k"
-TARGET_BUFSIZE = "2400k"
-TARGET_FPS = "24"
+# TOX3 프로파일: 실기기에서 잘 되던 medium 720p(~2Mbps) 기준 + 네트워크 여유
+MAX_HEIGHT = 720
+TARGET_MAXRATE = "1600k"
+TARGET_BUFSIZE = "3200k"
+TARGET_FPS = "30"
 FFMPEG_TIMEOUT_SEC = 900
 
 
@@ -117,15 +121,15 @@ def optimize_video_bytes(body: bytes, ext: str) -> VideoOptimizeResult:
             "-preset",
             "veryfast",
             "-crf",
-            "26",
+            "23",
             "-maxrate",
             TARGET_MAXRATE,
             "-bufsize",
             TARGET_BUFSIZE,
             "-profile:v",
-            "baseline",
+            "main",
             "-level",
-            "3.0",
+            "4.0",
             "-pix_fmt",
             "yuv420p",
             "-an",
