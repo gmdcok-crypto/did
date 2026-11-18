@@ -8,6 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [seedDone, setSeedDone] = useState(false)
+  const [showDefaultHint, setShowDefaultHint] = useState(false)
   const [backendOk, setBackendOk] = useState(null)
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -26,7 +27,12 @@ export default function Login() {
   useEffect(() => {
     fetch(`${API_BASE}/auth/ensure-seed`)
       .then((r) => r.json())
-      .catch(() => ({}))
+      .then((data) => {
+        setShowDefaultHint(Boolean(data?.show_default_login_hint))
+      })
+      .catch(() => {
+        setShowDefaultHint(false)
+      })
       .finally(() => setSeedDone(true))
   }, [])
 
@@ -85,7 +91,9 @@ export default function Login() {
             로그인
           </button>
         </form>
-        <p className="hint">기본 계정: admin / admin (로그인 후 비밀번호를 변경하세요)</p>
+        {showDefaultHint && (
+          <p className="hint">기본 계정: admin / admin (로그인 후 비밀번호를 변경하세요)</p>
+        )}
         <p className="hint">연결 안 됨이면 백엔드(localhost:8000) 실행 후 "연결 다시 확인"을 누르세요.</p>
       </div>
     </div>

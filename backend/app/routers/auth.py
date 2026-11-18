@@ -87,7 +87,8 @@ async def run_ensure_seed() -> dict:
             created_group = True
 
         r = await db.execute(select(User).where(User.email == DEFAULT_ADMIN_LOGIN))
-        if r.scalar_one_or_none() is None:
+        admin_user = r.scalar_one_or_none()
+        if admin_user is None:
             db.add(
                 User(
                     email=DEFAULT_ADMIN_LOGIN,
@@ -97,12 +98,22 @@ async def run_ensure_seed() -> dict:
             )
             await db.commit()
             created_admin = True
+            admin_user = (
+                await db.execute(select(User).where(User.email == DEFAULT_ADMIN_LOGIN))
+            ).scalar_one_or_none()
+
+        # 기본 비밀번호가 그대로일 때만 로그인 화면에 안내 표시
+        show_default_login_hint = bool(
+            admin_user
+            and verify_password(DEFAULT_ADMIN_PASSWORD, admin_user.hashed_password)
+        )
 
     return {
         "ok": True,
         "created": created_admin or created_group,
         "created_admin": created_admin,
         "created_group": created_group,
+        "show_default_login_hint": show_default_login_hint,
     }
 
 
