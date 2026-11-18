@@ -1,25 +1,26 @@
 """Create initial admin user and default device group. Run: python -m app.init_db"""
 import asyncio
+from sqlalchemy import select
 from app.database import engine, AsyncSessionLocal, Base
 from app.models import User, DeviceGroup
 from app.auth import get_password_hash
+from app.default_admin import DEFAULT_ADMIN_LOGIN, DEFAULT_ADMIN_PASSWORD
 
 
 async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with AsyncSessionLocal() as db:
-        from sqlalchemy import select
-        r = await db.execute(select(User).where(User.email == "admin@example.com"))
+        r = await db.execute(select(User).where(User.email == DEFAULT_ADMIN_LOGIN))
         if r.scalar_one_or_none() is None:
             u = User(
-                email="admin@example.com",
-                hashed_password=get_password_hash("admin123"),
+                email=DEFAULT_ADMIN_LOGIN,
+                hashed_password=get_password_hash(DEFAULT_ADMIN_PASSWORD),
                 role="admin",
             )
             db.add(u)
             await db.commit()
-            print("Created admin user: admin@example.com / admin123")
+            print(f"Created admin user: {DEFAULT_ADMIN_LOGIN} / {DEFAULT_ADMIN_PASSWORD}")
         else:
             print("Admin user already exists")
 

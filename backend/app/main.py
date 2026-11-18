@@ -234,14 +234,16 @@ async def _background_startup_db() -> None:
             r = await db.execute(select(User).limit(1))
             first_user = r.scalars().first()
             if first_user is None:
+                from app.default_admin import DEFAULT_ADMIN_LOGIN, DEFAULT_ADMIN_PASSWORD
+
                 u = User(
-                    email="admin@example.com",
-                    hashed_password=get_password_hash("admin123"),
+                    email=DEFAULT_ADMIN_LOGIN,
+                    hashed_password=get_password_hash(DEFAULT_ADMIN_PASSWORD),
                     role="admin",
                 )
                 db.add(u)
                 await db.commit()
-                print("Created default admin: admin@example.com / admin123")
+                print(f"Created default admin: {DEFAULT_ADMIN_LOGIN} / {DEFAULT_ADMIN_PASSWORD}")
     except Exception as e:
         print(f"Startup seed failed (run manually if needed): cd backend && python -m app.init_db — {e}")
 

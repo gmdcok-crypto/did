@@ -29,7 +29,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 - API: http://localhost:8000  
-- 관리자: `admin@example.com` / `admin123` (init_db 실행 후)
+- 관리자: `admin` / `admin` (init_db 실행 후, 로그인 후 비밀번호 변경 권장)
 
 #### HTTPS로 실행 (PC 로컬)
 
@@ -93,7 +93,7 @@ npm run dev
 ## 첫 동작 확인 순서
 
 1. 백엔드 실행 → `python -m app.init_db` → `uvicorn app.main:app --reload --port 8000`
-2. CMS에서 로그인 (admin@example.com / admin123)
+2. CMS에서 로그인 (admin / admin)
 3. CMS **미디어**에서 콘텐츠 추가 (타입: image 또는 video, URL 입력)
 4. CMS **캠페인**에서 캠페인 생성 (콘텐츠 ID 연결은 API 또는 추후 UI에서)
 5. CMS **디바이스**에서 그룹 확인 (init_db로 "기본" 그룹 생성됨)

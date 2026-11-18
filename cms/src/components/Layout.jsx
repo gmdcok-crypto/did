@@ -7,6 +7,7 @@ const nav = [
   { to: '/campaigns', label: '캠페인' },
   { to: '/schedules', label: '스케줄' },
   { to: '/devices', label: '디바이스' },
+  { to: '/account', label: '계정' },
 ]
 
 export default function Layout() {

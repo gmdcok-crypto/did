@@ -52,8 +52,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!token && SKIP_AUTH && !skipAuthTried.current) {
       skipAuthTried.current = true
-      const email = import.meta.env.VITE_SKIP_AUTH_EMAIL || 'admin@example.com'
-      const password = import.meta.env.VITE_SKIP_AUTH_PASSWORD || 'admin123'
+      const email = import.meta.env.VITE_SKIP_AUTH_EMAIL || 'admin'
+      const password = import.meta.env.VITE_SKIP_AUTH_PASSWORD || 'admin'
       login(email, password)
         .catch(() => setLoading(false))
       return

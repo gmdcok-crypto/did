@@ -66,8 +66,9 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           {error && <div className="error">{error}</div>}
           <input
-            type="email"
-            placeholder="이메일"
+            type="text"
+            placeholder="아이디"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -75,6 +76,7 @@ export default function Login() {
           <input
             type="password"
             placeholder="비밀번호"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -83,7 +85,7 @@ export default function Login() {
             로그인
           </button>
         </form>
-        <p className="hint">기본 계정: admin@example.com / admin123</p>
+        <p className="hint">기본 계정: admin / admin (로그인 후 비밀번호를 변경하세요)</p>
         <p className="hint">연결 안 됨이면 백엔드(localhost:8000) 실행 후 "연결 다시 확인"을 누르세요.</p>
       </div>
     </div>
