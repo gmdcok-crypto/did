@@ -659,24 +659,150 @@ a:hover {
   width: 200px;
 }
 
-/* 캠페인 추가 탭: datetime-local 달력 아이콘 흰색(다크 UI) */
-.campaign-form-add input[type='datetime-local'].campaign-add-datetime,
-input.campaign-add-datetime[type='datetime-local'] {
+/* 캠페인 일시: 확인/더블클릭 확정 달력 */
+.dt-confirm {
+  position: relative;
+  display: inline-block;
+  min-width: 220px;
+}
+
+.dt-confirm-inline {
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.dt-confirm-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.dt-confirm-trigger:hover:not(:disabled) {
+  border-color: var(--accent-dim);
+}
+
+.dt-confirm-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dt-confirm-placeholder {
+  color: var(--text-dim);
+}
+
+.dt-confirm-caret {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.dt-confirm-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(300px, 92vw);
+  padding: 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.dt-confirm-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.dt-confirm-weekdays,
+.dt-confirm-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dt-confirm-weekdays span {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.2rem 0;
+}
+
+.dt-confirm-day {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  min-height: 2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dt-confirm-day:hover:not(.empty) {
+  background: var(--accent-soft);
+}
+
+.dt-confirm-day.selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dt-confirm-day.empty {
+  cursor: default;
+  pointer-events: none;
+}
+
+.dt-confirm-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.dt-confirm-time-row input[type='time'] {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text);
   color-scheme: dark;
+  font: inherit;
 }
 
-.campaign-form-add input.campaign-add-datetime::-webkit-calendar-picker-indicator,
-input.campaign-add-datetime::-webkit-calendar-picker-indicator {
-  filter: brightness(0) invert(1);
-  opacity: 1;
-  cursor: pointer;
+.dt-confirm-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.35;
 }
 
-.campaign-form-add input.campaign-add-datetime::-moz-calendar-picker-indicator,
-input.campaign-add-datetime::-moz-calendar-picker-indicator {
-  filter: brightness(0) invert(1);
-  opacity: 1;
-  cursor: pointer;
+.dt-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.campaign-form-add .dt-confirm.campaign-add-datetime {
+  min-width: 260px;
+  flex: 1;
+  max-width: 320px;
 }
 
 .form-row {

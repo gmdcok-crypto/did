@@ -6,6 +6,7 @@ import {
   utcIsoToDatetimeLocalKst,
   datetimeLocalKstToUtcIso,
 } from '../lib/datetimeKst'
+import DatetimeConfirmPicker from '../components/DatetimeConfirmPicker'
 
 const TABS = [
   { id: 'list', label: '목록' },
@@ -237,19 +238,19 @@ export default function Campaigns() {
                               />
                             </td>
                             <td>
-                              <input
-                                type="datetime-local"
-                                className="input-sm"
+                              <DatetimeConfirmPicker
+                                className="dt-confirm-inline"
+                                inputClassName="input-sm"
                                 value={editForm.start_at}
-                                onChange={(e) => setEditForm((f) => ({ ...f, start_at: e.target.value }))}
+                                onChange={(v) => setEditForm((f) => ({ ...f, start_at: v }))}
                               />
                             </td>
                             <td>
-                              <input
-                                type="datetime-local"
-                                className="input-sm"
+                              <DatetimeConfirmPicker
+                                className="dt-confirm-inline"
+                                inputClassName="input-sm"
                                 value={editForm.end_at}
-                                onChange={(e) => setEditForm((f) => ({ ...f, end_at: e.target.value }))}
+                                onChange={(v) => setEditForm((f) => ({ ...f, end_at: v }))}
                               />
                             </td>
                             <td>
@@ -336,20 +337,18 @@ export default function Campaigns() {
                 </div>
                 <div className="form-row">
                   <label>시작일시</label>
-                  <input
+                  <DatetimeConfirmPicker
                     className="campaign-add-datetime"
-                    type="datetime-local"
                     value={addForm.start_at}
-                    onChange={(e) => setAddForm((f) => ({ ...f, start_at: e.target.value }))}
+                    onChange={(v) => setAddForm((f) => ({ ...f, start_at: v }))}
                   />
                 </div>
                 <div className="form-row">
                   <label>종료일시</label>
-                  <input
+                  <DatetimeConfirmPicker
                     className="campaign-add-datetime"
-                    type="datetime-local"
                     value={addForm.end_at}
-                    onChange={(e) => setAddForm((f) => ({ ...f, end_at: e.target.value }))}
+                    onChange={(v) => setAddForm((f) => ({ ...f, end_at: v }))}
                   />
                 </div>
                 <div className="form-row">
