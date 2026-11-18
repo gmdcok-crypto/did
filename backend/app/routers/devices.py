@@ -87,6 +87,33 @@ class DeviceListItem(BaseModel):
         from_attributes = True
 
 
+async def _default_group_id(db: AsyncSession, group_id: Optional[int]) -> Optional[int]:
+    if group_id is not None:
+        return group_id
+    gr = await db.execute(select(DeviceGroup).order_by(DeviceGroup.id).limit(1))
+    default_group = gr.scalar_one_or_none()
+    return default_group.id if default_group else None
+
+
+async def _reuse_existing_device(
+    db: AsyncSession,
+    existing: Device,
+    *,
+    name: str,
+    location: str,
+    group_id: Optional[int],
+) -> DeviceRegisterResponse:
+    """기존 기기 행을 갱신하고 같은 device_id를 반환 (중복 등록 방지)."""
+    existing.name = name
+    existing.location = location
+    existing.registered_at = datetime.utcnow()
+    existing.group_id = await _default_group_id(db, group_id)
+    await db.flush()
+    await db.refresh(existing)
+    broadcast_device_list_updated()
+    return DeviceRegisterResponse(device_id=existing.device_id)
+
+
 @router.post("/register", response_model=DeviceRegisterResponse)
 async def register_device(
     data: DeviceRegisterRequest,
@@ -96,39 +123,47 @@ async def register_device(
     if not expected or (data.auth_code or "").strip() != expected:
         raise HTTPException(status_code=403, detail="인증코드가 올바르지 않습니다.")
 
-    # 재등록: previous_device_id가 있고 해당 기기가 있으면 갱신 후 같은 ID 반환 (그룹에 중복 추가 안 됨)
+    name = (data.name or "").strip() or "Device"
+    location = (data.location or "").strip()
+
+    # 1) 재등록: localStorage previous_device_id가 있으면 그 기기 갱신
     if data.previous_device_id and (data.previous_device_id or "").strip():
         prev_id = (data.previous_device_id or "").strip()
         r = await db.execute(select(Device).where(Device.device_id == prev_id))
         existing = r.scalar_one_or_none()
         if existing:
-            existing.name = data.name or existing.name or "Device"
-            existing.location = data.location or ""
-            existing.registered_at = datetime.utcnow()
-            if data.group_id is not None:
-                existing.group_id = data.group_id
-            else:
-                gr = await db.execute(select(DeviceGroup).order_by(DeviceGroup.id).limit(1))
-                default_group = gr.scalar_one_or_none()
-                if default_group:
-                    existing.group_id = default_group.id
-            await db.flush()
-            await db.refresh(existing)
-            broadcast_device_list_updated()
-            return DeviceRegisterResponse(device_id=existing.device_id)
+            return await _reuse_existing_device(
+                db,
+                existing,
+                name=name,
+                location=location,
+                group_id=data.group_id,
+            )
 
+    # 2) 이름+위치가 같은 기존 기기가 있으면 합치기 (셋톱 재설정·캐시 삭제 후 재등록)
+    r = await db.execute(
+        select(Device)
+        .where(Device.name == name, Device.location == location)
+        .order_by(Device.registered_at.desc(), Device.id.desc())
+        .limit(1)
+    )
+    by_name_loc = r.scalar_one_or_none()
+    if by_name_loc:
+        return await _reuse_existing_device(
+            db,
+            by_name_loc,
+            name=name,
+            location=location,
+            group_id=data.group_id,
+        )
+
+    # 3) 없으면 신규 등록
     device_id = str(uuid.uuid4())
-    group_id = data.group_id
-    if group_id is None:
-        r = await db.execute(select(DeviceGroup).order_by(DeviceGroup.id).limit(1))
-        default_group = r.scalar_one_or_none()
-        if default_group:
-            group_id = default_group.id
     device = Device(
         device_id=device_id,
-        name=data.name or "Device",
-        location=data.location or "",
-        group_id=group_id,
+        name=name,
+        location=location,
+        group_id=await _default_group_id(db, data.group_id),
         registered_at=datetime.utcnow(),
     )
     db.add(device)
