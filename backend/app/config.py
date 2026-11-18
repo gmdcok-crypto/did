@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     r2_public_base_url: str = ""
     # 회사에서만 아는 디바이스 등록용 인증코드 (플레이어가 등록 시 필수)
     registration_auth_code: str = "dev1234"
+    # did_monitor 등 중앙 모니터가 호출하는 요약 API 토큰 (비우면 /api/monitor/* 비활성)
+    monitor_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("MONITOR_TOKEN", "monitor_token"),
+    )
     # DDNS/외부 접속 시 CORS 허용 출처 (쉼표 구분). 예: https://noteserver.iptime.org:5173,https://noteserver.iptime.org:5174
     cors_origins_extra: str = ""
     # last_seen 갱신 없이 이 시간(초)이 지나면 offline (스케줄 폴링 주기보다 길게 설정할 것 — 기본 180초=3분, 폴링 2분)
